@@ -23,10 +23,10 @@ enum Message {
     ResizeColumnsEnabled(bool),
     MinWidthEnabled(bool),
     DarkThemeEnabled(bool),
-    Notes(usize, String),
-    Category(usize, Category),
-    Enabled(usize, bool),
-    Delete(usize),
+    EditNotes(usize, String),
+    CategoryChange(usize, Category),
+    EnabledRow(usize, bool),
+    DeleteRow(usize),
 }
 
 struct App {
@@ -102,22 +102,22 @@ impl App {
                     self.theme = Theme::Light;
                 }
             }
-            Message::Category(index, category) => {
+            Message::CategoryChange(index, category) => {
                 if let Some(row) = self.rows.get_mut(index) {
                     row.category = category;
                 }
             }
-            Message::Enabled(index, is_enabled) => {
+            Message::EnabledRow(index, is_enabled) => {
                 if let Some(row) = self.rows.get_mut(index) {
                     row.is_enabled = is_enabled;
                 }
             }
-            Message::Notes(index, notes) => {
+            Message::EditNotes(index, notes) => {
                 if let Some(row) = self.rows.get_mut(index) {
                     row.notes = notes;
                 }
             }
-            Message::Delete(index) => {
+            Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
         }
@@ -305,18 +305,18 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
 
             ColumnKind::Index => text(row_index).into(),
             ColumnKind::Category => pick_list(Category::ALL, Some(row.category), move |category| {
-                Message::Category(row_index, category)
+                Message::CategoryChange(row_index, category)
             })
             .into(),
             ColumnKind::Enabled => checkbox("", row.is_enabled)
-                .on_toggle(move |enabled| Message::Enabled(row_index, enabled))
+                .on_toggle(move |enabled| Message::EnabledRow(row_index, enabled))
                 .into(),
             ColumnKind::Notes => text_input("", &row.notes)
-                .on_input(move |notes| Message::Notes(row_index, notes))
+                .on_input(move |notes| Message::EditNotes(row_index, notes))
                 .width(Length::Fill)
                 .into(),
             ColumnKind::Delete => button(text("Delete"))
-                .on_press(Message::Delete(row_index))
+                .on_press(Message::DeleteRow(row_index))
                 .into(),
         };
 
