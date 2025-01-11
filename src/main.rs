@@ -2,8 +2,7 @@ use std::fmt;
 use std::time::Instant;
 
 use iced::widget::{
-    button, checkbox, column, container, horizontal_space, pick_list, responsive, scrollable, text,
-    text_input,
+    button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
 };
 use iced::{Element, Length, Renderer, Task, Theme};
 use iced_table::table;

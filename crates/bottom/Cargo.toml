@@ -1,0 +1,246 @@
+[package]
+name = "bottom"
+version = "0.11.0"
+repository = "https://github.com/ClementTsang/bottom"
+license = "MIT"
+description = "A customizable cross-platform graphical process/system monitor for the terminal. Supports Linux, macOS, and Windows."
+documentation = "https://clementtsang.github.io/bottom/stable"
+readme = "README.md"
+default-run = "btm"
+build = "build.rs"
+authors = ["Clement Tsang <cjhtsang@uwaterloo.ca>"]
+keywords = ["cross-platform", "monitoring", "cli", "top", "tui"]
+categories = ["command-line-utilities", "visualization"]
+exclude = [
+    ".cargo-husky/",
+    ".github/",
+    ".idea",
+    ".vscode/",
+    "assets/",
+    "desktop/",
+    "docs/",
+    "flamegraphs/",
+    "sample_configs/",
+    "schema/",
+    "scripts/",
+    "wix/",
+    ".all-contributorsrc",
+    ".cirrus.yml",
+    ".gitignore",
+    ".markdownlint.json",
+    "CHANGELOG.md",
+    "clippy.toml",
+    "codecov.yml",
+    "CONTRIBUTING.md",
+    "Cross.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+]
+edition = "2021"
+# The oldest version I've tested that should still build - note this is not an official MSRV!
+rust-version = "1.81"
+
+[lib]
+test = true
+doctest = true
+doc = true
+
+[[bin]]
+name = "btm"
+path = "src/bin/main.rs"
+doc = false
+
+[[bin]]
+name = "schema"
+path = "src/bin/schema.rs"
+test = false
+doctest = false
+doc = false
+required-features = ["generate_schema"]
+
+[features]
+# Used for general builds.
+battery = ["starship-battery"]
+nvidia = ["nvml-wrapper"]
+gpu = ["nvidia"]
+zfs = []
+deploy = ["battery", "gpu", "zfs"]
+default = ["deploy"]
+
+# Should not be included in builds.
+logging = ["fern", "log", "time"]
+generate_schema = ["schemars", "serde_json", "strum"]
+
+[dependencies]
+anyhow = "1.0.95"
+backtrace = "0.3.74"
+cfg-if = "1.0.0"
+clap = { version = "4.5.23", features = ["default", "cargo", "wrap_help", "derive"] }
+concat-string = "1.0.1"
+crossterm = "0.28.1"
+ctrlc = { version = "3.4.5", features = ["termination"] }
+dirs = "5.0.1"
+# Maybe consider https://github.com/rust-lang/rustc-hash for some cases too?
+hashbrown = "0.15.2"
+humantime = "2.1.0"
+indexmap = "2.7.0"
+indoc = "2.0.5"
+itertools = "0.14.0"
+nvml-wrapper = { version = "0.10.0", optional = true, features = ["legacy-functions"] }
+regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive"] }
+starship-battery = { version = "0.10.0", optional = true }
+sysinfo = "=0.30.13"
+toml_edit = { version = "0.22.22", features = ["serde"] }
+tui = { version = "0.29.0", package = "ratatui" }
+unicode-ellipsis = "0.3.0"
+unicode-segmentation = "1.12.0"
+unicode-width = "0.2.0"
+
+# Used for logging.
+fern = { version = "0.7.1", optional = true }
+log = { version = "0.4.22", optional = true }
+time = { version = "0.3.37", features = ["local-offset", "formatting", "macros"], optional = true }
+
+# These are just used for JSON schema generation.
+schemars = { version = "0.8.21", optional = true }
+serde_json = { version = "1.0.135", optional = true }
+strum = { version = "0.26.3", features = ["derive"], optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.169"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "0.38.42", features = ["fs", "param"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.0"
+mach2 = "0.4.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58.0", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(target_os = "freebsd")'.dependencies]
+serde_json = { version = "1.0.133" }
+sysctl = { version = "0.6.0" }
+filedescriptor = "0.8.2"
+
+[dev-dependencies]
+assert_cmd = "2.0.16"
+cargo-husky = { version = "1.5.0", default-features = false, features = ["user-hooks"] }
+predicates = "3.1.3"
+tempfile = "3.15.0"
+
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dev-dependencies]
+portable-pty = "0.8.1"
+
+[build-dependencies]
+clap = { version = "4.5.23", features = ["default", "cargo", "wrap_help", "derive"] }
+clap_complete = "4.5.40"
+clap_complete_nushell = "4.5.5"
+clap_complete_fig = "4.5.2"
+clap_mangen = "0.2.24"
+indoc = "2.0.5"
+
+# Compile dependencies with optimizations enabled, even in debug mode.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = 0
+strip = "symbols"
+lto = true
+opt-level = 3
+codegen-units = 1
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
+
+[package.metadata.deb]
+section = "utility"
+assets = [
+    [
+        "target/release/btm",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "LICENSE",
+        "usr/share/doc/btm/",
+        "644",
+    ],
+    [
+        "manpage/btm.1.gz",
+        "usr/share/man/man1/btm.1.gz",
+        "644",
+    ],
+    [
+        "completion/btm.bash",
+        "usr/share/bash-completion/completions/btm",
+        "644",
+    ],
+    [
+        "completion/btm.fish",
+        "usr/share/fish/vendor_completions.d/btm.fish",
+        "644",
+    ],
+    [
+        "completion/_btm",
+        "usr/share/zsh/vendor-completions/",
+        "644",
+    ],
+    [
+        "desktop/bottom.desktop",
+        "usr/share/applications/bottom.desktop",
+        "644",
+    ],
+]
+extended-description = """
+
+By default, bottom will look for a config file in ~/.config/bottom/bottom.toml. A config file can be specified \
+using `-C`. If a config file does not exist at the specified or default location, a default one will be created \
+for the user there.
+"""
+
+[package.metadata.deb.variants.arm64]
+depends = "libc6:arm64 (>= 2.28)"
+
+[package.metadata.deb.variants.armhf]
+depends = "libc6:armhf (>= 2.28)"
+
+[package.metadata.wix]
+output = "bottom_x86_64_installer.msi"
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/btm", dest = "/usr/bin/", mode = "755" },
+    { source = "LICENSE", dest = "/usr/share/doc/btm/", mode = "644" },
+    { source = "manpage/btm.1.gz", dest = "/usr/share/man/man1/btm.1.gz", mode = "644", doc = true },
+    { source = "completion/btm.bash", dest = "/usr/share/bash-completion/completions/btm", mode = "644" },
+    { source = "completion/btm.fish", dest = "/usr/share/fish/vendor_completions.d/btm.fish", mode = "644" },
+    { source = "completion/_btm", dest = "/usr/share/zsh/vendor-completions/", mode = "644" },
+    { source = "desktop/bottom.desktop", dest = "/usr/share/applications/bottom.desktop", mode = "644" },
+]
+
+[lints.rust]
+rust_2018_idioms = "deny"
+# missing_docs = "deny"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+missing_crate_level_docs = "deny"
+
+[lints.clippy]
+todo = "deny"
+unimplemented = "deny"
+missing_safety_doc = "deny"
