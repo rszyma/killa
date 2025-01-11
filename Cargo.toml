@@ -7,24 +7,42 @@ license = "GPL-3.0-or-later"
 edition = "2021"
 publish = false
 
-# [lints]
-# workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["winit"] # Just enable some features of it; see below
-
 [dependencies]
-eframe = { version = "0.30.0", default-features = false, features = [
-    # accesskit struggles with threading
-    "default_fonts",
-    "wayland",
-    # "x11",
-    "wgpu",
-] }
-env_logger = { version = "0.10", default-features = false, features = [
-    "auto-color",
-    "humantime",
-] }
-# This is normally enabled by eframe/default, which is not being used here
-# because of accesskit, as mentioned above
-winit = { version = "0.30.8",  features = ["default"] }
+bottom = "0.10.2"
+bytesize.workspace = true
+iced.workspace = true
+iced_table.workspace = true
+
+[workspace.dependencies]
+bytesize = "1.1"
+iced = { version = "0.13.1", features = ["system", "lazy"] }
+iced_table = "0.13.0"
+
+# + auto-detect-theme
+# + fira-sans
+# + tiny-skia
+# + wgpu
+# - advanced
+# - async-std
+# - canvas
+# - debug
+# - highlighter
+# - iced_highlighter
+# - image
+# - image-without-codecs
+# - lazy
+# - markdown
+# - multi-window
+# - qr_code
+# - smol
+# - svg
+# - system
+# - tokio
+# - web-colors
+# - webgl
+
+[workspace]
+members = [
+    ".",
+    "examples/*",
+]

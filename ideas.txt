@@ -1,0 +1,1 @@
+- color cpu/mem in red more, higher the usage (smth like )9i8
