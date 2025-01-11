@@ -1,168 +1,308 @@
-use std::fmt::Display;
+use std::fmt;
 
-use iced::widget::{button, center, column, text};
-use iced::{system, widget, Alignment, Element, Task, Theme};
+use iced::widget::{
+    button, checkbox, column, container, horizontal_space, pick_list, responsive, scrollable, text,
+    text_input,
+};
+use iced::{Element, Length, Renderer, Task, Theme};
+use iced_table::table;
 
-mod sysinfo;
-
-pub fn main() -> iced::Result {
-    iced::application("fsm / fastsm", App::update, App::view)
-        .theme(|_| Theme::Dark)
-        .run_with(App::new)
-}
-
-#[derive(Default)]
-#[allow(clippy::large_enum_variant)]
-enum App {
-    #[default]
-    Loading,
-    Loaded {
-        sys_info: system::Information,
-        // table: iced_table::Table<'a, _>,
-    },
-}
-
-#[derive(Clone, Debug)]
-#[allow(clippy::large_enum_variant)]
-enum Message {
-    InformationReceived(system::Information),
-    Refresh,
-    Table(TableMessage),
+fn main() {
+    iced::application(App::title, App::update, App::view)
+        .theme(App::theme)
+        .run()
+        .unwrap()
 }
 
 #[derive(Debug, Clone)]
-enum TableMessage {
-    ProduceResults,
-    /// refresh table with new data
-    RefreshResults(prettytable::Table),
-    // SyncHeader(scrollable::AbsoluteOffset),
+enum Message {
+    SyncHeader(scrollable::AbsoluteOffset),
+    Resizing(usize, f32),
+    Resized,
+    ResizeColumnsEnabled(bool),
+    FooterEnabled(bool),
+    MinWidthEnabled(bool),
+    DarkThemeEnabled(bool),
+    Notes(usize, String),
+    Category(usize, Category),
+    Enabled(usize, bool),
+    Delete(usize),
+}
+
+struct App {
+    columns: Vec<Column>,
+    rows: Vec<Row>,
+    header: scrollable::Id,
+    body: scrollable::Id,
+    footer: scrollable::Id,
+    resize_columns_enabled: bool,
+    footer_enabled: bool,
+    min_width_enabled: bool,
+    theme: Theme,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            columns: vec![
+                Column::new(ColumnKind::Index),
+                Column::new(ColumnKind::Category),
+                Column::new(ColumnKind::Enabled),
+                Column::new(ColumnKind::Notes),
+                Column::new(ColumnKind::Delete),
+            ],
+            rows: (0..50).map(Row::generate).collect(),
+            header: scrollable::Id::unique(),
+            body: scrollable::Id::unique(),
+            footer: scrollable::Id::unique(),
+            resize_columns_enabled: true,
+            footer_enabled: true,
+            min_width_enabled: true,
+            theme: Theme::Light,
+        }
+    }
 }
 
 impl App {
-    fn new() -> (Self, Task<Message>) {
-        (
-            Self::Loading,
-            system::fetch_information().map(Message::InformationReceived),
-        )
+    fn title(&self) -> String {
+        "Iced Table".into()
+    }
+
+    fn theme(&self) -> Theme {
+        self.theme.clone()
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Refresh => {
-                let (state, refresh) = Self::new();
-                *self = state;
-                refresh
+            Message::SyncHeader(offset) => {
+                return Task::batch(vec![
+                    scrollable::scroll_to(self.header.clone(), offset),
+                    scrollable::scroll_to(self.footer.clone(), offset),
+                ])
             }
-            Message::InformationReceived(sys_info) => {
-                *self = Self::Loaded { sys_info };
-                Task::none()
+            Message::Resizing(index, offset) => {
+                if let Some(column) = self.columns.get_mut(index) {
+                    column.resize_offset = Some(offset);
+                }
             }
-            Message::Table(t) => match t {
-                TableMessage::ProduceResults => todo!(),
-                TableMessage::RefreshResults(_) => todo!(),
-                TableMessage::SyncHeader(_) => todo!(),
-            },
+            Message::Resized => self.columns.iter_mut().for_each(|column| {
+                if let Some(offset) = column.resize_offset.take() {
+                    column.width += offset;
+                }
+            }),
+            Message::ResizeColumnsEnabled(enabled) => self.resize_columns_enabled = enabled,
+            Message::FooterEnabled(enabled) => self.footer_enabled = enabled,
+            Message::MinWidthEnabled(enabled) => self.min_width_enabled = enabled,
+            Message::DarkThemeEnabled(enabled) => {
+                if enabled {
+                    self.theme = Theme::Dark;
+                } else {
+                    self.theme = Theme::Light;
+                }
+            }
+            Message::Category(index, category) => {
+                if let Some(row) = self.rows.get_mut(index) {
+                    row.category = category;
+                }
+            }
+            Message::Enabled(index, is_enabled) => {
+                if let Some(row) = self.rows.get_mut(index) {
+                    row.is_enabled = is_enabled;
+                }
+            }
+            Message::Notes(index, notes) => {
+                if let Some(row) = self.rows.get_mut(index) {
+                    row.notes = notes;
+                }
+            }
+            Message::Delete(index) => {
+                self.rows.remove(index);
+            }
         }
+
+        Task::none()
     }
 
     fn view(&self) -> Element<Message> {
-        // let content: Element<_> = match self {
-        //     App::Loading => text("Loading...").size(25).into(),
-        //     App::Loaded {
-        //         sys_info: information,
-        //     } => sysinfo::system_info_element(information),
-        // };
-        // center(content).into()
-
-        widget::container(widget::scrollable(|_| {
-            let results_table: iced_table::Table<
-                '_,
-                TableColumn,
-                TableRow<String>,
-                TableMessage,
-                Theme,
-            > = iced_table::table(
-                self.results_header.clone(),
-                self.results_body.clone(),
-                &self.results_titles,
-                &self.results_rows,
-                TableMessage::SyncHeader,
+        let table = responsive(|size| {
+            let mut table = table(
+                self.header.clone(),
+                self.body.clone(),
+                &self.columns,
+                &self.rows,
+                Message::SyncHeader,
             );
-            results_table.into()
-        }))
-        .into()
-    }
 
-    // fn view(&self) -> Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-    //     // let content =
-    //     //     column![results_table].spacing(20);
-    // }
+            if self.resize_columns_enabled {
+                table = table.on_column_resize(Message::Resizing, Message::Resized);
+            }
+            if self.footer_enabled {
+                table = table.footer(self.footer.clone());
+            }
+            if self.min_width_enabled {
+                table = table.min_width(size.width);
+            }
+
+            table.into()
+        });
+
+        let content = column![
+            checkbox("Resize Columns", self.resize_columns_enabled,)
+                .on_toggle(Message::ResizeColumnsEnabled),
+            checkbox("Footer", self.footer_enabled,).on_toggle(Message::FooterEnabled),
+            checkbox("Min Width", self.min_width_enabled,).on_toggle(Message::MinWidthEnabled),
+            checkbox("Dark Theme", matches!(self.theme, Theme::Dark),)
+                .on_toggle(Message::DarkThemeEnabled),
+            table,
+        ]
+        .spacing(6);
+
+        container(container(content).width(Length::Fill).height(Length::Fill))
+            .padding(20)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into()
+    }
 }
 
-// TODO: Create wrappers around prettytable::Row
-//       to correspond to Column and Row required by iced_table
-#[derive(Clone)]
-struct TableColumn {
-    kind: TableColumnKind,
-    align: Alignment,
+struct Column {
+    kind: ColumnKind,
     width: f32,
     resize_offset: Option<f32>,
-} // Hiding columns requires a wrapper around `type Row = Vec<GUICell<String>>`
-
-struct TableRow<T: Display> {
-    data: Vec<TableCell<T>>,
-}
-impl<S: Into<String>, I: IntoIterator<Item = S>> From<I> for TableRow<String> {
-    fn from(value: I) -> Self {
-        Self {
-            data: value
-                .into_iter()
-                .map(Into::into)
-                .map(TableCell::from)
-                .collect_vec(),
-        }
-    }
 }
 
-// impl From<prettytable::Row> for GUIRow<String> {
-//     fn from(value: prettytable::Row) -> Self {
-//         value.into_iter()
-//     }
-// }
-
-#[derive(Clone)]
-enum TableColumnKind {
-    Index(String), // For displaying text
-}
-
-impl TableColumn {
-    fn new(kind: TableColumnKind, alignment: Option<Alignment>) -> Self {
+impl Column {
+    fn new(kind: ColumnKind) -> Self {
         let width = match kind {
-            TableColumnKind::Index(_) => 60.0,
+            ColumnKind::Index => 60.0,
+            ColumnKind::Category => 100.0,
+            ColumnKind::Enabled => 155.0,
+            ColumnKind::Notes => 400.0,
+            ColumnKind::Delete => 100.0,
         };
 
-        let align = if let Some(a) = alignment {
-            a
-        } else {
-            Alignment::End
-        };
         Self {
             kind,
-            align,
             width,
             resize_offset: None,
         }
     }
 }
 
-impl<S: ToString> From<S> for TableColumn {
-    fn from(value: S) -> Self {
-        TableColumn::new(TableColumnKind::Index(value.to_string()), None)
+enum ColumnKind {
+    Index,
+    Category,
+    Enabled,
+    Notes,
+    Delete,
+}
+
+struct Row {
+    notes: String,
+    category: Category,
+    is_enabled: bool,
+}
+
+impl Row {
+    fn generate(index: usize) -> Self {
+        let category = match index % 5 {
+            0 => Category::A,
+            1 => Category::B,
+            2 => Category::C,
+            3 => Category::D,
+            4 => Category::E,
+            _ => unreachable!(),
+        };
+        let is_enabled = index % 5 < 4;
+
+        Self {
+            notes: String::new(),
+            category,
+            is_enabled,
+        }
     }
 }
 
-#[derive(Clone)]
-struct TableCell<T: Display> {
-    content: T,
-    align: Alignment, // TODO: Find a way to retrieve alignment
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Category {
+    A,
+    B,
+    C,
+    D,
+    E,
+}
+
+impl Category {
+    const ALL: &'static [Self] = &[Self::A, Self::B, Self::C, Self::D, Self::E];
+}
+
+impl fmt::Display for Category {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Category::A => "A",
+            Category::B => "B",
+            Category::C => "C",
+            Category::D => "D",
+            Category::E => "E",
+        }
+        .fmt(f)
+    }
+}
+
+impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
+    type Row = Row;
+
+    fn header(&'a self, _col_index: usize) -> Element<'a, Message> {
+        let content = match self.kind {
+            ColumnKind::Index => "Index",
+            ColumnKind::Category => "Category",
+            ColumnKind::Enabled => "Enabled",
+            ColumnKind::Notes => "Notes",
+            ColumnKind::Delete => "",
+        };
+
+        container(text(content)).center_y(24).into()
+    }
+
+    fn cell(&'a self, _col_index: usize, row_index: usize, row: &'a Row) -> Element<'a, Message> {
+        let content: Element<_> = match self.kind {
+            ColumnKind::Index => text(row_index).into(),
+            ColumnKind::Category => pick_list(Category::ALL, Some(row.category), move |category| {
+                Message::Category(row_index, category)
+            })
+            .into(),
+            ColumnKind::Enabled => checkbox("", row.is_enabled)
+                .on_toggle(move |enabled| Message::Enabled(row_index, enabled))
+                .into(),
+            ColumnKind::Notes => text_input("", &row.notes)
+                .on_input(move |notes| Message::Notes(row_index, notes))
+                .width(Length::Fill)
+                .into(),
+            ColumnKind::Delete => button(text("Delete"))
+                .on_press(Message::Delete(row_index))
+                .into(),
+        };
+
+        container(content).width(Length::Fill).center_y(32).into()
+    }
+
+    fn footer(&'a self, _col_index: usize, rows: &'a [Row]) -> Option<Element<'a, Message>> {
+        let content = if matches!(self.kind, ColumnKind::Enabled) {
+            let total_enabled = rows.iter().filter(|row| row.is_enabled).count();
+
+            Element::from(text(format!("Total Enabled: {total_enabled}")))
+        } else {
+            horizontal_space().into()
+        };
+
+        Some(container(content).center_y(24).into())
+    }
+
+    fn width(&self) -> f32 {
+        self.width
+    }
+
+    fn resize_offset(&self) -> Option<f32> {
+        self.resize_offset
+    }
 }

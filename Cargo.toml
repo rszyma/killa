@@ -1,19 +1,20 @@
 [package]
 name = "fastsm"
 description = "System monitor specifically for Wayland"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["rszyma <rszyma.dev@gmail.com>"]
 license = "GPL-3.0-or-later"
 edition = "2021"
 publish = false
 
 [dependencies]
-bottom = "0.10.2"
+bottom.workspace = true
 bytesize.workspace = true
 iced.workspace = true
 iced_table.workspace = true
 
 [workspace.dependencies]
+bottom = "0.10.2"
 bytesize = "1.1"
 iced = { version = "0.13.1", features = ["system", "lazy"] }
 iced_table = "0.13.0"
