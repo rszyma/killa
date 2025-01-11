@@ -6,7 +6,7 @@ use iced::{system, widget, Alignment, Element, Task, Theme};
 mod sysinfo;
 
 pub fn main() -> iced::Result {
-    iced::application("fsm / fastsm", App::update, App::view)
+    iced::application("killa", App::update, App::view)
         .theme(|_| Theme::Dark)
         .run_with(App::new)
 }

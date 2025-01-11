@@ -1,4 +1,5 @@
 use std::fmt;
+use std::time::Instant;
 
 use iced::widget::{
     button, checkbox, column, container, horizontal_space, pick_list, responsive, scrollable, text,
@@ -45,6 +46,13 @@ impl Default for App {
     fn default() -> Self {
         Self {
             columns: vec![
+                Column::new(ColumnKind::Name),
+                Column::new(ColumnKind::Memory),
+                Column::new(ColumnKind::Cpu),
+                Column::new(ColumnKind::Pid),
+                Column::new(ColumnKind::Command),
+                Column::new(ColumnKind::Started),
+                //
                 Column::new(ColumnKind::Index),
                 Column::new(ColumnKind::Category),
                 Column::new(ColumnKind::Enabled),
@@ -174,11 +182,18 @@ struct Column {
 impl Column {
     fn new(kind: ColumnKind) -> Self {
         let width = match kind {
-            ColumnKind::Index => 60.0,
-            ColumnKind::Category => 100.0,
-            ColumnKind::Enabled => 155.0,
-            ColumnKind::Notes => 400.0,
-            ColumnKind::Delete => 100.0,
+            ColumnKind::Name => 350.0,
+            ColumnKind::Memory => 100.0,
+            ColumnKind::Cpu => 60.0,
+            ColumnKind::Pid => 80.0,
+            ColumnKind::Command => 400.0,
+            ColumnKind::Started => 150.0,
+
+            ColumnKind::Index => 10.0,    // 60.0,
+            ColumnKind::Category => 10.0, // 100.0,
+            ColumnKind::Enabled => 10.0,  // 155.0,
+            ColumnKind::Notes => 10.0,    // 400.0,
+            ColumnKind::Delete => 10.0,   // 100.0,
         };
 
         Self {
@@ -189,7 +204,16 @@ impl Column {
     }
 }
 
+// name, memory, CPU, pid, command line, started
+
 enum ColumnKind {
+    Name,
+    Memory,
+    Cpu,
+    Pid,
+    Command,
+    Started,
+
     Index,
     Category,
     Enabled,
@@ -197,7 +221,12 @@ enum ColumnKind {
     Delete,
 }
 
+/// Actual storage for data row.
 struct Row {
+    program_name: String,
+    pid: usize,
+    command: String,
+
     notes: String,
     category: Category,
     is_enabled: bool,
@@ -216,6 +245,10 @@ impl Row {
         let is_enabled = index % 5 < 4;
 
         Self {
+            program_name: "killa".to_string(),
+            pid: 42 + index,
+            command: "killa --version".to_string(),
+
             notes: String::new(),
             category,
             is_enabled,
@@ -254,6 +287,13 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
 
     fn header(&'a self, _col_index: usize) -> Element<'a, Message> {
         let content = match self.kind {
+            ColumnKind::Name => "Name",
+            ColumnKind::Memory => "Memory",
+            ColumnKind::Cpu => "CPU",
+            ColumnKind::Pid => "ID",
+            ColumnKind::Command => "Command",
+            ColumnKind::Started => "Started",
+
             ColumnKind::Index => "Index",
             ColumnKind::Category => "Category",
             ColumnKind::Enabled => "Enabled",
@@ -266,6 +306,13 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
 
     fn cell(&'a self, _col_index: usize, row_index: usize, row: &'a Row) -> Element<'a, Message> {
         let content: Element<_> = match self.kind {
+            ColumnKind::Name => text!("{}", row.program_name).into(),
+            ColumnKind::Memory => text!("{} Mb", 100).into(),
+            ColumnKind::Cpu => text!("{} %", 10.0).into(),
+            ColumnKind::Pid => text!("{}", row.pid).into(),
+            ColumnKind::Command => text!("{}", row.command).into(),
+            ColumnKind::Started => text!("{:?}", Instant::now()).into(),
+
             ColumnKind::Index => text(row_index).into(),
             ColumnKind::Category => pick_list(Category::ALL, Some(row.category), move |category| {
                 Message::Category(row_index, category)

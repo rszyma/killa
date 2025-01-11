@@ -1,6 +1,6 @@
 [package]
-name = "fastsm"
-description = "System monitor specifically for Wayland"
+name = "killa"
+description = "Process monitor for Wayland"
 version = "0.0.0"
 authors = ["rszyma <rszyma.dev@gmail.com>"]
 license = "GPL-3.0-or-later"

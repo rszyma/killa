@@ -1,6 +1,6 @@
 - color cpu/mem in red more, higher the usage (smth like )9i8
 
-v0.1.0 fastsm milestone - all features:
+v0.1.0 killa milestone - all features:
 one page view with processes list. clone the looks from gnome-system-monitor
 take the info from bottom crate
 iced for gui lib
