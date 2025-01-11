@@ -21,7 +21,6 @@ enum Message {
     Resizing(usize, f32),
     Resized,
     ResizeColumnsEnabled(bool),
-    FooterEnabled(bool),
     MinWidthEnabled(bool),
     DarkThemeEnabled(bool),
     Notes(usize, String),
@@ -35,9 +34,7 @@ struct App {
     rows: Vec<Row>,
     header: scrollable::Id,
     body: scrollable::Id,
-    footer: scrollable::Id,
     resize_columns_enabled: bool,
-    footer_enabled: bool,
     min_width_enabled: bool,
     theme: Theme,
 }
@@ -53,18 +50,16 @@ impl Default for App {
                 Column::new(ColumnKind::Command),
                 Column::new(ColumnKind::Started),
                 //
-                Column::new(ColumnKind::Index),
-                Column::new(ColumnKind::Category),
-                Column::new(ColumnKind::Enabled),
-                Column::new(ColumnKind::Notes),
-                Column::new(ColumnKind::Delete),
+                // Column::new(ColumnKind::Index),
+                // Column::new(ColumnKind::Category),
+                // Column::new(ColumnKind::Enabled),
+                // Column::new(ColumnKind::Notes),
+                // Column::new(ColumnKind::Delete),
             ],
-            rows: (0..50).map(Row::generate).collect(),
+            rows: (0..300).map(Row::generate).collect(),
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
-            footer: scrollable::Id::unique(),
             resize_columns_enabled: true,
-            footer_enabled: true,
             min_width_enabled: true,
             theme: Theme::Light,
         }
@@ -73,7 +68,7 @@ impl Default for App {
 
 impl App {
     fn title(&self) -> String {
-        "Iced Table".into()
+        "killa".into()
     }
 
     fn theme(&self) -> Theme {
@@ -85,8 +80,8 @@ impl App {
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
                     scrollable::scroll_to(self.header.clone(), offset),
-                    scrollable::scroll_to(self.footer.clone(), offset),
-                ])
+                    // scrollable::scroll_to(self.footer.clone(), offset),
+                ]);
             }
             Message::Resizing(index, offset) => {
                 if let Some(column) = self.columns.get_mut(index) {
@@ -99,7 +94,6 @@ impl App {
                 }
             }),
             Message::ResizeColumnsEnabled(enabled) => self.resize_columns_enabled = enabled,
-            Message::FooterEnabled(enabled) => self.footer_enabled = enabled,
             Message::MinWidthEnabled(enabled) => self.min_width_enabled = enabled,
             Message::DarkThemeEnabled(enabled) => {
                 if enabled {
@@ -144,9 +138,6 @@ impl App {
             if self.resize_columns_enabled {
                 table = table.on_column_resize(Message::Resizing, Message::Resized);
             }
-            if self.footer_enabled {
-                table = table.footer(self.footer.clone());
-            }
             if self.min_width_enabled {
                 table = table.min_width(size.width);
             }
@@ -157,7 +148,6 @@ impl App {
         let content = column![
             checkbox("Resize Columns", self.resize_columns_enabled,)
                 .on_toggle(Message::ResizeColumnsEnabled),
-            checkbox("Footer", self.footer_enabled,).on_toggle(Message::FooterEnabled),
             checkbox("Min Width", self.min_width_enabled,).on_toggle(Message::MinWidthEnabled),
             checkbox("Dark Theme", matches!(self.theme, Theme::Dark),)
                 .on_toggle(Message::DarkThemeEnabled),
@@ -331,18 +321,6 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
         };
 
         container(content).width(Length::Fill).center_y(32).into()
-    }
-
-    fn footer(&'a self, _col_index: usize, rows: &'a [Row]) -> Option<Element<'a, Message>> {
-        let content = if matches!(self.kind, ColumnKind::Enabled) {
-            let total_enabled = rows.iter().filter(|row| row.is_enabled).count();
-
-            Element::from(text(format!("Total Enabled: {total_enabled}")))
-        } else {
-            horizontal_space().into()
-        };
-
-        Some(container(content).center_y(24).into())
     }
 
     fn width(&self) -> f32 {

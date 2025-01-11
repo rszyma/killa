@@ -1,7 +1,10 @@
-- color cpu/mem in red more, higher the usage (smth like )9i8
 
 v0.1.0 killa milestone - all features:
 one page view with processes list. clone the looks from gnome-system-monitor
 take the info from bottom crate
 iced for gui lib
 iced_table for table
+
+versions 0.2.0-and-later:
+process icons (like in gsm)
+color cpu/mem in red more, higher the usage (smth like )9i8

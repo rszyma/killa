@@ -3,3 +3,6 @@
 
 run:
     cargo run
+
+r:
+    cargo run --release
