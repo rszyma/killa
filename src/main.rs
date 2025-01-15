@@ -1,6 +1,6 @@
-use std::fmt;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Instant;
+use std::{default, fmt, thread};
 
 use bottom::app::DataFilters;
 use bottom::create_collection_thread;
@@ -35,22 +35,34 @@ enum Message {
 }
 
 struct Collector {
-    rx: mpsc::Receiver<BottomEvent>,
+    pub last_data: Arc<Mutex<Box<bottom::data_collection::Data>>>,
 }
 
 impl Collector {
-    fn iter(&self) {
-        for e in self.rx.iter() {
-            if let BottomEvent::Update(data) = e {
-                // dbg!(&data.collection_time);
-                for cpu_item in data.cpu.unwrap_or_default() {
-                    if let bottom::data_collection::cpu::CpuDataType::Cpu(n) = cpu_item.data_type {
-                        println!("cpu: {} usage: {}", n, cpu_item.cpu_usage);
+    fn new(rx: mpsc::Receiver<BottomEvent>) -> Self {
+        let self_ = Self {
+            last_data: Default::default(),
+        };
+        let last_data_clone = self_.last_data.clone();
+        thread::spawn(move || {
+            for e in rx.iter() {
+                if let BottomEvent::Update(data) = e {
+                    // dbg!(&data.collection_time);
+                    for cpu_item in data.clone().cpu.unwrap_or_default() {
+                        if let bottom::data_collection::cpu::CpuDataType::Cpu(n) =
+                            cpu_item.data_type
+                        {
+                            println!("cpu: {} usage: {}", n, cpu_item.cpu_usage);
+                        }
                     }
+                    println!("=============");
+                    let last_data = last_data_clone.clone();
+                    let mut data_store = last_data.lock().unwrap();
+                    *data_store = data; // TODO: doesn't this do bitwise copy?
                 }
-                println!("=============")
             }
-        }
+        });
+        self_
     }
 }
 
@@ -129,10 +141,8 @@ impl Default for App {
             },
         );
 
-        let collector = Collector { rx };
-
         Self {
-            collector,
+            collector: Collector::new(rx),
             columns: vec![
                 Column::new(ColumnKind::Name),
                 Column::new(ColumnKind::Memory),
