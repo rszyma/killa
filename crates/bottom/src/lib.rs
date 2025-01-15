@@ -7,20 +7,20 @@
 //! application. If you are instead looking for documentation regarding the
 //! *usage* of bottom, refer to [here](https://clementtsang.github.io/bottom/stable/).
 
-pub(crate) mod app;
-mod utils {
-    pub(crate) mod cancellation_token;
-    pub(crate) mod data_prefixes;
-    pub(crate) mod data_units;
-    pub(crate) mod general;
-    pub(crate) mod logging;
-    pub(crate) mod strings;
+pub mod app;
+pub mod utils {
+    pub mod cancellation_token;
+    pub mod data_prefixes;
+    pub mod data_units;
+    pub mod general;
+    pub mod logging;
+    pub mod strings;
 }
-pub(crate) mod canvas;
-pub(crate) mod constants;
-pub(crate) mod data_collection;
-pub(crate) mod data_conversion;
-pub(crate) mod event;
+pub mod canvas;
+pub mod constants;
+pub mod data_collection;
+pub mod data_conversion;
+pub mod event;
 pub mod options;
 pub mod widgets;
 
@@ -60,7 +60,8 @@ use utils::logging::*;
 
 /// Try drawing. If not, clean up the terminal and return an error.
 fn try_drawing(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
     painter: &mut canvas::Painter,
 ) -> anyhow::Result<()> {
     if let Err(err) = painter.draw_data(terminal, app) {
@@ -141,7 +142,8 @@ fn panic_hook(panic_info: &PanicHookInfo<'_>) {
 
 /// Create a thread to poll for user inputs and forward them to the main thread.
 fn create_input_thread(
-    sender: Sender<BottomEvent>, cancellation_token: Arc<CancellationToken>,
+    sender: Sender<BottomEvent>,
+    cancellation_token: Arc<CancellationToken>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut mouse_timer = Instant::now();
@@ -210,10 +212,13 @@ fn create_input_thread(
 }
 
 /// Create a thread to handle data collection.
-fn create_collection_thread(
-    sender: Sender<BottomEvent>, control_receiver: Receiver<CollectionThreadEvent>,
-    cancellation_token: Arc<CancellationToken>, app_config_fields: &AppConfigFields,
-    filters: DataFilters, used_widget_set: UsedWidgets,
+pub fn create_collection_thread(
+    sender: Sender<BottomEvent>,
+    control_receiver: Receiver<CollectionThreadEvent>,
+    cancellation_token: Arc<CancellationToken>,
+    app_config_fields: &AppConfigFields,
+    filters: DataFilters,
+    used_widget_set: UsedWidgets,
 ) -> JoinHandle<()> {
     let temp_type = app_config_fields.temperature_type;
     let use_current_cpu_total = app_config_fields.use_current_cpu_total;

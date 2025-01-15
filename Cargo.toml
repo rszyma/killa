@@ -7,14 +7,20 @@ license = "GPL-3.0-or-later"
 edition = "2021"
 publish = false
 
+[workspace]
+members = [
+    ".",
+    "examples/*",
+    "crates/*",
+]
+
 [dependencies]
-bottom.workspace = true
+bottom = { path = "./crates/bottom" }
 bytesize.workspace = true
 iced.workspace = true
 iced_table.workspace = true
 
 [workspace.dependencies]
-bottom = "0.10.2"
 bytesize = "1.1"
 iced = { version = "0.13.1", features = ["system", "lazy"] }
 iced_table = "0.13.0"
@@ -41,9 +47,3 @@ iced_table = "0.13.0"
 # - tokio
 # - web-colors
 # - webgl
-
-[workspace]
-members = [
-    ".",
-    "examples/*",
-]

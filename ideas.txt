@@ -5,6 +5,24 @@ take the info from bottom crate
 iced for gui lib
 iced_table for table
 
-versions 0.2.0-and-later:
+ctrl+f for search
+- up/down arrows always work within that context (and infact without any context)
+- always select first option
+enter to show details
+    - and provide the output with just plain-text read-only inputbox, so it's easy to copy all info.
+- esc clears search, but keeps selection (or not? ig, will need to test)
+some shortcut to open submenu with sorting? or just use 1,2,3,4,5 for name,cpu,mem,pid,time
+    - due to the fact that program names usually don't contain number, by default clicking numbers won't trigger search,
+    - while letters do (but don't really focus the input for inputting letters, only focus on click of the "toggle numbers search"  
+      button next to search input)
+- 789 numbers to trigger different views (graphs, processes, disks(?).. I'm just listin what gnome has..)
+- after sorting, jump to first entry
+- ctrl+, to trigger options
+- options ideally can be imported/exported, so it works well with nix
+    - another idea is for options to export git patch since last change (lmao),
+      and you can indicate where to what nix file to apply the patch
+
+################################
+# versions 0.2.0-and-later:
 process icons (like in gsm)
 color cpu/mem in red more, higher the usage (smth like )9i8

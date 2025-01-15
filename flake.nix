@@ -22,20 +22,22 @@
           extensions = [ "rust-src" ];
           # targets = [ target ];
         };
+        mkScript = name: text: (pkgs.writeShellScriptBin name text);
+        devshellScripts = [
+          (mkScript "f" ''cargo run'')
+        ];
       in
       {
         devShells.default = pkgs.mkShell rec {
-          buildInputs = with pkgs; [
+          nativeBuildInputs = with pkgs; [
             # (rust-bin.stable."1.73.0".default.override toolchainOverride)
             # (rust-bin.stable.latest.default.override toolchainOverride)
             (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override toolchainOverride))
-
-            # deps
             cmake
-            # ncurses
             pkg-config
-            # scdoc
-            expat
+            expat # xml parser
+          ] ++ devshellScripts;
+          buildInputs = with pkgs; [
             fontconfig
             freetype
             libGL
@@ -43,7 +45,6 @@
             libxkbcommon
             vulkan-loader
             wayland
-            # xdg-utils
           ];
           WINIT_UNIX_BACKEND = "wayland";
           # WGPU_POWER_PREF = "low";

@@ -6,8 +6,8 @@ license = "MIT"
 description = "A customizable cross-platform graphical process/system monitor for the terminal. Supports Linux, macOS, and Windows."
 documentation = "https://clementtsang.github.io/bottom/stable"
 readme = "README.md"
-default-run = "btm"
-build = "build.rs"
+# default-run = "btm"
+# build = "build.rs"
 authors = ["Clement Tsang <cjhtsang@uwaterloo.ca>"]
 keywords = ["cross-platform", "monitoring", "cli", "top", "tui"]
 categories = ["command-line-utilities", "visualization"]
@@ -44,19 +44,21 @@ rust-version = "1.81"
 test = true
 doctest = true
 doc = true
+name = "bottom"
+path = "src/lib.rs"
 
-[[bin]]
-name = "btm"
-path = "src/bin/main.rs"
-doc = false
+# [[bin]]
+# name = "btm"
+# path = "src/bin/main.rs"
+# doc = false
 
-[[bin]]
-name = "schema"
-path = "src/bin/schema.rs"
-test = false
-doctest = false
-doc = false
-required-features = ["generate_schema"]
+# [[bin]]
+# name = "schema"
+# path = "src/bin/schema.rs"
+# test = false
+# doctest = false
+# doc = false
+# required-features = ["generate_schema"]
 
 [features]
 # Used for general builds.
@@ -135,7 +137,7 @@ filedescriptor = "0.8.2"
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
-cargo-husky = { version = "1.5.0", default-features = false, features = ["user-hooks"] }
+# cargo-husky = { version = "1.5.0", default-features = false, features = ["user-hooks"] }
 predicates = "3.1.3"
 tempfile = "3.15.0"
 
