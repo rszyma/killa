@@ -25,6 +25,7 @@
         mkScript = name: text: (pkgs.writeShellScriptBin name text);
         devshellScripts = [
           (mkScript "f" ''cargo run'')
+          (mkScript "fr" ''cargo run --release'')
         ];
       in
       {

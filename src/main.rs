@@ -1,5 +1,9 @@
+use std::cell::Cell;
+use std::hash::Hash;
+use std::rc::Rc;
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::Instant;
+use std::task::Poll;
+use std::time::{Duration, Instant};
 use std::{default, fmt, thread};
 
 use bottom::app::DataFilters;
@@ -7,21 +11,33 @@ use bottom::create_collection_thread;
 use bottom::data_collection::temperature::TemperatureType;
 use bottom::data_collection::DataCollector;
 use bottom::event::BottomEvent;
+use iced::futures::channel::mpsc as iced_mpsc;
+use iced::futures::{self, Stream, StreamExt};
 use iced::widget::{
     button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
 };
-use iced::{Element, Length, Renderer, Task, Theme};
+use iced::{Element, Event, Length, Renderer, Subscription, Task, Theme};
+use iced_futures::subscription::{self, from_recipe, EventStream, Hasher, Recipe};
+use iced_futures::{boxed_stream, BoxStream, MaybeSend};
 use iced_table::table;
+use stream_ext::filter_map;
+
+mod optional_every;
+mod stream_ext;
+mod subscription_filter_map;
 
 fn main() {
     iced::application(App::title, App::update, App::view)
+        .subscription(App::subscription)
         .theme(App::theme)
         .run()
         .unwrap()
 }
 
+/// Messages that update UI.
 #[derive(Debug, Clone)]
 enum Message {
+    CollectedData(Arc<bottom::data_collection::Data>),
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
     Resized,
@@ -34,8 +50,14 @@ enum Message {
     DeleteRow(usize),
 }
 
+#[derive(Clone, Default)]
+struct LastCollectedData {
+    pub data: Arc<bottom::data_collection::Data>,
+    pub accessed: bool,
+}
+
 struct Collector {
-    pub last_data: Arc<Mutex<Box<bottom::data_collection::Data>>>,
+    pub last_data: Arc<Mutex<LastCollectedData>>,
 }
 
 impl Collector {
@@ -48,17 +70,19 @@ impl Collector {
             for e in rx.iter() {
                 if let BottomEvent::Update(data) = e {
                     // dbg!(&data.collection_time);
-                    for cpu_item in data.clone().cpu.unwrap_or_default() {
-                        if let bottom::data_collection::cpu::CpuDataType::Cpu(n) =
-                            cpu_item.data_type
-                        {
-                            println!("cpu: {} usage: {}", n, cpu_item.cpu_usage);
-                        }
-                    }
-                    println!("=============");
+                    // for cpu_item in data.clone().cpu.unwrap_or_default() {
+                    //     if let bottom::data_collection::cpu::CpuDataType::Cpu(n) =
+                    //         cpu_item.data_type
+                    //     {
+                    //         println!("cpu: {} usage: {}", n, cpu_item.cpu_usage);
+                    //     }
+                    // }
+                    // println!("=============");
                     let last_data = last_data_clone.clone();
                     let mut data_store = last_data.lock().unwrap();
-                    *data_store = data; // TODO: doesn't this do bitwise copy?
+                    data_store.data = Arc::from(data); // TODO: doesn't this do bitwise copy?
+                    dbg!("thread: {}", data_store.accessed);
+                    data_store.accessed = false;
                 }
             }
         });
@@ -74,7 +98,7 @@ struct App {
     resize_columns_enabled: bool,
     min_width_enabled: bool,
     theme: Theme,
-    collector: Collector,
+    collector: Arc<Collector>,
 }
 
 impl Default for App {
@@ -142,7 +166,7 @@ impl Default for App {
         );
 
         Self {
-            collector: Collector::new(rx),
+            collector: Arc::new(Collector::new(rx)),
             columns: vec![
                 Column::new(ColumnKind::Name),
                 Column::new(ColumnKind::Memory),
@@ -167,6 +191,102 @@ impl Default for App {
     }
 }
 
+// pub trait Stream {
+//     type Item;
+
+//     // Required method
+//     fn poll_next(
+//         self: Pin<&mut Self>,
+//         cx: &mut Context<'_>,
+//     ) -> Poll<Option<Self::Item>>;
+
+//     // Provided method
+//     fn size_hint(&self) -> (usize, Option<usize>) { ... }
+// }
+
+// struct TickStream {
+//     last_tick: Cell<Instant>,
+//     interval: Duration,
+// }
+
+// impl Stream for TickStream {
+//     type Item = Message;
+
+//     fn poll_next(
+//         self: std::pin::Pin<&mut Self>,
+//         _: &mut std::task::Context<'_>,
+//     ) -> Poll<Option<Self::Item>> {
+//         let now = Instant::now();
+//         if (self.last_tick.get() + self.interval) < now {
+//             self.last_tick.set(now);
+//             Poll::Ready(Some(Message::Tick))
+//         } else {
+//             Poll::Pending
+//         }
+//     }
+// }
+
+// fn some_worker() -> impl Stream<Item = Message> {
+//     stream::channel(100, |mut output| async move {
+//         // Create channel
+//         let (sender, mut receiver) = iced_mpsc::channel(100);
+
+//         // Send the sender back to the application
+//         output.send(Event::Ready(sender)).await;
+
+//         loop {
+//             use iced_futures::futures::StreamExt;
+
+//             // Read next input sent from `Application`
+//             let input = receiver.select_next_some().await;
+
+//             match input {
+//                 Input::DoSomeWork => {
+//                     // Do some async work...
+
+//                     // Finally, we can optionally produce a message to tell the
+//                     // `Application` the work is done
+//                     output.send(Event::WorkFinished).await;
+//                 }
+//             }
+//         }
+//     })
+// }
+
+#[derive(Debug)]
+struct PollBtm(std::time::Duration);
+
+impl subscription::Recipe for PollBtm {
+    type Output = std::time::Instant;
+
+    fn hash(&self, state: &mut Hasher) {
+        use std::hash::Hash;
+
+        std::any::TypeId::of::<Self>().hash(state);
+        self.0.hash(state);
+    }
+
+    fn stream(
+        self: Box<Self>,
+        _input: subscription::EventStream,
+    ) -> futures::stream::BoxStream<'static, Self::Output> {
+        use futures::stream::StreamExt;
+
+        let start = tokio::time::Instant::now() + self.0;
+
+        let mut interval = tokio::time::interval_at(start, self.0);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        let stream = {
+            futures::stream::unfold(interval, |mut interval| async move {
+                Some((interval.tick().await, interval))
+            })
+        };
+
+        stream.map(tokio::time::Instant::into_std).boxed()
+    }
+}
+
 impl App {
     fn title(&self) -> String {
         "killa".into()
@@ -176,8 +296,46 @@ impl App {
         self.theme.clone()
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        // dbg!("subscription called");
+        // poll for new collection every X ms
+        // let tick_ms = 10;
+        // FIXME: why the heck is calling this so expensive...
+
+        // let ts = TickStream {
+        //     last_tick: Instant::now().into(),
+        //     interval: Duration::from_millis(100),
+        // };
+
+        let collector_copy = self.collector.clone();
+
+        #[derive(Hash)]
+        struct _Poll;
+
+        iced::time::every(std::time::Duration::from_millis(100))
+            .map(|_| filter_map(_Poll))
+            .map(move |_| {
+                let mut lock = collector_copy.last_data.lock().unwrap();
+                if !lock.accessed {
+                    dbg!("accessing last collector data");
+                    lock.accessed = true;
+                    // let cpu = lock.data.cpu.clone().unwrap_or_default();
+                    // dbg!(cpu);
+                    Message::CollectedData(lock.data.clone())
+                } else {
+                    Message::CollectedData(lock.data.clone()) // todo: make noop
+                }
+            })
+
+        // Subscription::none()
+    }
+
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::CollectedData(data) => {
+                dbg!("tock");
+                dbg!(&data.list_of_batteries);
+            }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
                     scrollable::scroll_to(self.header.clone(), offset),
@@ -226,7 +384,9 @@ impl App {
         Task::none()
     }
 
+    /// This is called every time a Message has been processed in [`Self::update`]
     fn view(&self) -> Element<Message> {
+        println!("{:?}", Instant::now());
         let table = responsive(|size| {
             let mut table = table(
                 self.header.clone(),

@@ -18,12 +18,26 @@ members = [
 bottom = { path = "./crates/bottom" }
 bytesize.workspace = true
 iced.workspace = true
+iced_futures = "0.13.2"
 iced_table.workspace = true
+tokio = "1.43.0"
 
 [workspace.dependencies]
 bytesize = "1.1"
-iced = { version = "0.13.1", features = ["system", "lazy"] }
+iced = { version = "0.13.1", features = [
+    "system", "lazy", "tokio",
+    # "logging"
+    # "debug"
+] }
+
+# 0.14 waiting room - which will include perf optizmiation improvement
+# when just moving mouse around.
+#  https://github.com/iced-rs/iced/pull/2662
 iced_table = "0.13.0"
+
+[workspace.dependencies.tokio]
+workspace = true
+features = ["time"]
 
 # + auto-detect-theme
 # + fira-sans
