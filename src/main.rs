@@ -92,6 +92,23 @@ impl App {
         match message {
             Message::CollectedData(data) => {
                 dbg!("tock");
+
+                // todo: collect this only once
+                let num_of_cpu = match data
+                    .cpu
+                    .unwrap_or_default()
+                    .last()
+                    .unwrap_or(&bottom::data_collection::cpu::CpuData {
+                        data_type: bottom::data_collection::cpu::CpuDataType::Cpu(0),
+                        cpu_usage: 0.0,
+                    })
+                    .data_type
+                {
+                    bottom::data_collection::cpu::CpuDataType::Cpu(n) => n + 1,
+                    bottom::data_collection::cpu::CpuDataType::Avg => 0,
+                };
+                assert!(num_of_cpu > 0);
+
                 // dbg!(&data.list_of_batteries);
                 let rows: &mut Vec<Row> = self.rows.as_mut();
                 *rows = data
@@ -101,11 +118,14 @@ impl App {
                     .map(|ps| Row {
                         program_name: ps.name.clone(),
                         mem: ps.mem_usage_bytes / 1_000_000,
-                        cpu_perc: ps.cpu_usage_percent,
+                        cpu_perc: (((ps.cpu_usage_percent) / (num_of_cpu as f32) * 100.0) as i32)
+                            as f32
+                            / 100.0,
                         pid: ps.pid,
                         command: ps.command.clone(),
                     })
-                    .collect()
+                    .collect();
+                rows.sort_by_key(|row| (100 * 100) - (row.cpu_perc as u32 * 100));
             }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
