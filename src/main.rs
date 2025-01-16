@@ -1,3 +1,4 @@
+use collector::init::init_collector;
 use iced::widget::{
     button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
 };
@@ -20,14 +21,22 @@ fn main() {
     iced::application(App::title, App::update, App::view)
         .subscription(App::subscription)
         .theme(App::theme)
-        .run()
+        .run_with(init)
         .unwrap()
+}
+
+fn init() -> (App, iced::Task<Message>) {
+    let init_collector_task = Task::stream(some_worker()).then(|ev| match ev {
+        collector::colv2::Event::Ready(_sender) => Task::none(),
+        collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
+        collector::colv2::Event::WorkFinished => Task::none(),
+    });
+    (App::default(), init_collector_task)
 }
 
 /// Messages that update UI.
 #[derive(Debug, Clone)]
 enum Message {
-    NoOp,
     CollectedData(Box<bottom::data_collection::Data>),
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
@@ -89,16 +98,14 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         // I've no idea how to control frequency of calls of subscriptions...
-        Subscription::run(some_worker).map(|event| match event {
-            collector::colv2::Event::Ready(_sender) => Message::NoOp, // well it fucking sucks...
-            collector::colv2::Event::DataReady(data) => Message::CollectedData(data),
-            collector::colv2::Event::WorkFinished => Message::NoOp, // well it fucking sucks...
-        })
+        // if !initialized {
+        //     Subscription::run_with_id("init", )
+        // }
+        Subscription::none()
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::NoOp => {}
             Message::CollectedData(data) => {
                 dbg!("tock");
                 dbg!(&data.list_of_batteries);
