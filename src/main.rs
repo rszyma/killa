@@ -1,16 +1,12 @@
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
-use core::num;
 use iced::widget::{
-    button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
+    button, checkbox, column, container, responsive, scrollable, text,
 };
-use iced::{Element, Length, Renderer, Subscription, Task, Theme};
+use iced::{Element, Length, Renderer, Task, Theme};
 use iced_table::table;
-use std::cell::Cell;
 use std::fmt;
-use std::rc::Rc;
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 use crate::collector::colv2::some_worker;

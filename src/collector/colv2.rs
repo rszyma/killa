@@ -8,7 +8,6 @@ use iced_futures::futures::Stream;
 use iced_futures::stream;
 use tokio::time::sleep;
 
-use super::init::init_collector;
 
 pub enum Event {
     Ready(mpsc::Sender<Input>),
@@ -27,7 +26,7 @@ pub enum Input {
 pub fn some_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event> {
     stream::channel(100, |mut output| async move {
         // Create channel for communication back to app.
-        let (sender, mut receiver) = mpsc::channel(100);
+        let (sender, receiver) = mpsc::channel(100);
 
         // Send the sender back to the application
         output.send(Event::Ready(sender)).await;
