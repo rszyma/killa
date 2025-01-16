@@ -23,9 +23,12 @@ pub enum Input {
 }
 
 // currently this panics, idk
+#[inline(never)]
 pub fn some_worker() -> impl Stream<Item = Event> {
     stream::channel(100, |mut output| async move {
         let collector_rx = init_collector();
+
+        sleep(Duration::from_millis(500)).await;
 
         // Create channel for communication back to app.
         let (sender, mut receiver) = mpsc::channel(100);

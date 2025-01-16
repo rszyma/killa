@@ -1,25 +1,14 @@
-use std::cell::Cell;
-use std::hash::Hash;
-use std::rc::Rc;
-use std::sync::{mpsc, Arc, Mutex};
-use std::task::Poll;
-use std::time::{Duration, Instant};
-use std::{default, fmt, thread};
-
-use bottom::app::DataFilters;
-use bottom::create_collection_thread;
-use bottom::data_collection::temperature::TemperatureType;
-use bottom::data_collection::DataCollector;
-use bottom::event::BottomEvent;
-use iced::futures::channel::mpsc as iced_mpsc;
-use iced::futures::{self, StreamExt};
 use iced::widget::{
     button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
 };
-use iced::{Element, Event, Length, Renderer, Subscription, Task, Theme};
-use iced_futures::subscription::{self, from_recipe, EventStream, Hasher, Recipe};
-use iced_futures::{boxed_stream, MaybeSend};
+use iced::{Element, Length, Renderer, Subscription, Task, Theme};
 use iced_table::table;
+use std::cell::Cell;
+use std::fmt;
+use std::rc::Rc;
+use std::time::Instant;
+
+use crate::collector::colv2::some_worker;
 
 // mod optional_every;
 // mod stream_ext;
@@ -38,7 +27,7 @@ fn main() {
 /// Messages that update UI.
 #[derive(Debug, Clone)]
 enum Message {
-    DummyTest,
+    NoOp,
     CollectedData(Box<bottom::data_collection::Data>),
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
@@ -99,24 +88,17 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // let col = collector::Collector::new(rx);
-        // let sub = from_recipe(col).map(|x| Message::CollectedData(x.into()));
-        // Subscription::none(),
-        // Return the subscription
-        // unfold(col, |state| async move { Some((col.next(), col)) })
-        use crate::collector::colv2::some_worker;
+        // I've no idea how to control frequency of calls of subscriptions...
         Subscription::run(some_worker).map(|event| match event {
-            collector::colv2::Event::Ready(_sender) => Message::DummyTest,
+            collector::colv2::Event::Ready(_sender) => Message::NoOp, // well it fucking sucks...
             collector::colv2::Event::DataReady(data) => Message::CollectedData(data),
-            collector::colv2::Event::WorkFinished => Message::DummyTest,
+            collector::colv2::Event::WorkFinished => Message::NoOp, // well it fucking sucks...
         })
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::DummyTest => {
-                dbg!("testing 123");
-            }
+            Message::NoOp => {}
             Message::CollectedData(data) => {
                 dbg!("tock");
                 dbg!(&data.list_of_batteries);

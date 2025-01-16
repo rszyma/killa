@@ -10,7 +10,7 @@ pub fn init_collector() -> std::sync::mpsc::Receiver<bottom::event::BottomEvent>
 
     let (tx, rx) = mpsc::channel(); // use iced mpsc?
 
-    let update_rate = 500; // min is 250 i think
+    let update_rate = 1000; // min is 250 i think
 
     let btm_config = bottom::app::AppConfigFields {
         update_rate,
