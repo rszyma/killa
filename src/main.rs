@@ -11,11 +11,7 @@ use std::time::Instant;
 
 use crate::collector::colv2::some_worker;
 
-// mod optional_every;
-// mod stream_ext;
-// mod subscription_filter_map;
 mod collector;
-mod keys;
 
 fn main() {
     iced::application(App::title, App::update, App::view)
@@ -67,12 +63,6 @@ impl Default for App {
                 Column::new(ColumnKind::Pid),
                 Column::new(ColumnKind::Command),
                 Column::new(ColumnKind::Started),
-                //
-                // Column::new(ColumnKind::Index),
-                // Column::new(ColumnKind::Category),
-                // Column::new(ColumnKind::Enabled),
-                // Column::new(ColumnKind::Notes),
-                // Column::new(ColumnKind::Delete),
             ],
             rows: vec![],
             header: scrollable::Id::unique(),
