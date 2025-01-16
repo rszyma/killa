@@ -1,16 +1,12 @@
+use crate::collector::colv2::some_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
-use iced::widget::{
-    button, checkbox, column, container, responsive, scrollable, text,
-};
-use iced::{Element, Length, Renderer, Task, Theme};
+use iced::widget::{button, checkbox, column, container, responsive, scrollable, text};
+use iced::{Element, Font, Length, Pixels, Renderer, Task, Theme};
 use iced_table::table;
 use std::fmt;
 use std::sync::mpsc::Receiver;
 use std::time::Instant;
-
-use crate::collector::colv2::some_worker;
-
 mod collector;
 
 fn main() {
@@ -18,6 +14,10 @@ fn main() {
     let collector_rx = init_collector();
     iced::application(App::title, App::update, App::view)
         .theme(App::theme)
+        .default_font(Font {
+            weight: iced::font::Weight::Medium,
+            ..Default::default()
+        })
         .run_with(init(collector_rx))
         .unwrap()
 }
@@ -51,7 +51,6 @@ struct App {
     header: scrollable::Id,
     body: scrollable::Id,
     resize_columns_enabled: bool,
-    min_width_enabled: bool,
     theme: Theme,
 }
 
@@ -70,8 +69,7 @@ impl Default for App {
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
             resize_columns_enabled: true,
-            min_width_enabled: true,
-            theme: Theme::Dark,
+            theme: Theme::Light,
         }
     }
 }
@@ -93,13 +91,6 @@ impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::CollectedData(data) => {
-                dbg!("tock");
-
-                // todo: collect this only once
-                let num_of_cpu = num_cpus::get();
-                dbg!(num_of_cpu);
-                assert!(num_of_cpu > 0);
-
                 // dbg!(&data.list_of_batteries);
                 let rows: &mut Vec<Row> = self.rows.as_mut();
                 *rows = data
@@ -109,14 +100,14 @@ impl App {
                     .map(|ps| Row {
                         program_name: ps.name.clone(),
                         mem: ps.mem_usage_bytes / 1_000_000,
-                        cpu_perc: (((ps.cpu_usage_percent) / (num_of_cpu as f32) * 100.0) as i32)
-                            as f32
-                            / 100.0,
+                        cpu_perc: (((ps.cpu_usage_percent) / (num_cpus::get() as f32) * 10.0)
+                            as i32) as f32
+                            / 10.0,
                         pid: ps.pid,
                         command: ps.command.clone(),
                     })
                     .collect();
-                rows.sort_by_key(|row| (100 * 100) - (row.cpu_perc as u32 * 100));
+                rows.sort_by_key(|row| (100 * 10000) - (row.cpu_perc * 10000.0f32) as u32);
             }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
@@ -152,7 +143,7 @@ impl App {
 
     /// This is called every time a Message has been processed in [`Self::update`]
     fn view(&self) -> Element<Message> {
-        println!("view()");
+        // println!("view()");
         let table = responsive(|size| {
             let mut table = table(
                 self.header.clone(),
@@ -286,21 +277,22 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
     }
 
     fn cell(&'a self, _col_index: usize, row_index: usize, row: &'a Row) -> Element<'a, Message> {
+        let font_size = Pixels::from(13.0);
         let content: Element<_> = match self.kind {
-            ColumnKind::Name => text!("{}", row.program_name).into(),
-            ColumnKind::Memory => text!("{} MB", row.mem).into(),
-            ColumnKind::Cpu => text!("{} %", row.cpu_perc).into(),
-            ColumnKind::Pid => text!("{}", row.pid).into(),
-            ColumnKind::Command => text!("{}", row.command).into(),
-            ColumnKind::Started => text!("{:?}", Instant::now()).into(),
+            ColumnKind::Name => text!("{}", row.program_name).size(font_size).into(),
+            ColumnKind::Memory => text!("{} MB", row.mem).size(font_size).into(),
+            ColumnKind::Cpu => text!("{} %", row.cpu_perc).size(font_size).into(),
+            ColumnKind::Pid => text!("{}", row.pid).size(font_size).into(),
+            ColumnKind::Command => text!("{}", row.command).size(font_size).into(),
+            ColumnKind::Started => text!("{:?}", Instant::now()).size(font_size).into(),
 
-            ColumnKind::Index => text(row_index).into(),
-            ColumnKind::Delete => button(text("Delete"))
+            ColumnKind::Index => text(row_index).size(font_size).into(),
+            ColumnKind::Delete => button(text("Delete").size(font_size))
                 .on_press(Message::DeleteRow(row_index))
                 .into(),
         };
 
-        container(content).width(Length::Fill).center_y(32).into()
+        container(content).width(Length::Fill).center_y(15).into()
     }
 
     fn width(&self) -> f32 {
