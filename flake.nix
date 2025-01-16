@@ -119,7 +119,17 @@
 
         devShells.default = pkgs.mkShell {
           # checks = self.checks.${system};
-          nativeBuildInputs = nativeBuildInputs ++ devshellScripts;
+          nativeBuildInputs = nativeBuildInputs ++ devshellScripts ++ (
+            with pkgs;
+            let
+              toolchainOverride = { extensions = [ "rust-src" ]; };
+            in
+            [
+              # (rust-bin.stable."1.73.0".default.override toolchainOverride)
+              (rust-bin.stable.latest.default.override toolchainOverride)
+              # (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override toolchainOverride))
+            ]
+          );
           inherit buildInputs;
           # WINIT_UNIX_BACKEND = "wayland";
           # WGPU_POWER_PREF = "low";

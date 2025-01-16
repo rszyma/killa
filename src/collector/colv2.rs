@@ -1,3 +1,4 @@
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use bottom::event::BottomEvent;
@@ -23,11 +24,8 @@ pub enum Input {
 }
 
 // currently this panics, idk
-#[inline(never)]
-pub fn some_worker() -> impl Stream<Item = Event> {
+pub fn some_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event> {
     stream::channel(100, |mut output| async move {
-        let collector_rx = init_collector();
-
         // Create channel for communication back to app.
         let (sender, mut receiver) = mpsc::channel(100);
 

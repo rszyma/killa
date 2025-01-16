@@ -1,3 +1,4 @@
+use bottom::event::BottomEvent;
 use collector::init::init_collector;
 use core::num;
 use iced::widget::{
@@ -8,6 +9,8 @@ use iced_table::table;
 use std::cell::Cell;
 use std::fmt;
 use std::rc::Rc;
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 use crate::collector::colv2::some_worker;
@@ -15,20 +18,23 @@ use crate::collector::colv2::some_worker;
 mod collector;
 
 fn main() {
+    // Set collections thread as early as possible, to speed up first access to data.
+    let collector_rx = init_collector();
     iced::application(App::title, App::update, App::view)
-        .subscription(App::subscription)
         .theme(App::theme)
-        .run_with(init)
+        .run_with(init(collector_rx))
         .unwrap()
 }
 
-fn init() -> (App, iced::Task<Message>) {
-    let init_collector_task = Task::stream(some_worker()).then(|ev| match ev {
-        collector::colv2::Event::Ready(_sender) => Task::none(),
-        collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
-        collector::colv2::Event::WorkFinished => Task::none(),
-    });
-    (App::default(), init_collector_task)
+fn init(collector_rx: Receiver<BottomEvent>) -> impl FnOnce() -> (App, iced::Task<Message>) {
+    || {
+        let init_collector_task = Task::stream(some_worker(collector_rx)).then(|ev| match ev {
+            collector::colv2::Event::Ready(_sender) => Task::none(),
+            collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
+            collector::colv2::Event::WorkFinished => Task::none(),
+        });
+        (App::default(), init_collector_task)
+    }
 }
 
 /// Messages that update UI.
@@ -83,10 +89,10 @@ impl App {
         self.theme.clone()
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        // I've no idea how to control frequency of subscriptions calls...
-        Subscription::none()
-    }
+    // fn subscription(&self) -> Subscription<Message> {
+    //     // I've no idea how to control frequency of subscriptions calls...
+    //     Subscription::none()
+    // }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {

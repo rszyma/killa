@@ -40,9 +40,6 @@ pub fn init_collector() -> std::sync::mpsc::Receiver<bottom::event::BottomEvent>
         retention_ms: 600000,
         dedicated_average_row: false,
     };
-
-    // Set up the event loop thread.
-    // Set it up early to speed up first access to data.
     let _ = create_collection_thread(
         tx.clone(),
         mpsc::channel().1, // ignore msg channel for now
@@ -55,17 +52,16 @@ pub fn init_collector() -> std::sync::mpsc::Receiver<bottom::event::BottomEvent>
             net_filter: None,
         },
         bottom::app::layout_manager::UsedWidgets {
-            use_cpu: true,
-            use_mem: true,
-            use_cache: true,
-            use_gpu: true,
-            use_net: true,
             use_proc: true,
-            use_disk: true,
-            use_temp: true,
-            use_battery: true,
+            use_cpu: false,
+            use_mem: false,
+            use_cache: false,
+            use_gpu: false,
+            use_net: false,
+            use_disk: false,
+            use_temp: false,
+            use_battery: false,
         },
     );
-
     rx
 }
