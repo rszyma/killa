@@ -44,9 +44,6 @@ enum Message {
     ResizeColumnsEnabled(bool),
     MinWidthEnabled(bool),
     DarkThemeEnabled(bool),
-    EditNotes(usize, String),
-    CategoryChange(usize, Category),
-    EnabledRow(usize, bool),
     DeleteRow(usize),
 }
 
@@ -77,12 +74,12 @@ impl Default for App {
                 // Column::new(ColumnKind::Notes),
                 // Column::new(ColumnKind::Delete),
             ],
-            rows: (0..300).map(Row::generate).collect(),
+            rows: vec![],
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
             resize_columns_enabled: true,
             min_width_enabled: true,
-            theme: Theme::Light,
+            theme: Theme::Dark,
         }
     }
 }
@@ -97,10 +94,7 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // I've no idea how to control frequency of calls of subscriptions...
-        // if !initialized {
-        //     Subscription::run_with_id("init", )
-        // }
+        // I've no idea how to control frequency of subscriptions calls...
         Subscription::none()
     }
 
@@ -108,7 +102,20 @@ impl App {
         match message {
             Message::CollectedData(data) => {
                 dbg!("tock");
-                dbg!(&data.list_of_batteries);
+                // dbg!(&data.list_of_batteries);
+                let rows: &mut Vec<Row> = self.rows.as_mut();
+                *rows = data
+                    .list_of_processes
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|ps| Row {
+                        program_name: ps.name.clone(),
+                        mem: ps.mem_usage_bytes / 1_000_000,
+                        cpu_perc: ps.cpu_usage_percent,
+                        pid: ps.pid,
+                        command: ps.command.clone(),
+                    })
+                    .collect()
             }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
@@ -135,21 +142,6 @@ impl App {
                     self.theme = Theme::Light;
                 }
             }
-            Message::CategoryChange(index, category) => {
-                if let Some(row) = self.rows.get_mut(index) {
-                    row.category = category;
-                }
-            }
-            Message::EnabledRow(index, is_enabled) => {
-                if let Some(row) = self.rows.get_mut(index) {
-                    row.is_enabled = is_enabled;
-                }
-            }
-            Message::EditNotes(index, notes) => {
-                if let Some(row) = self.rows.get_mut(index) {
-                    row.notes = notes;
-                }
-            }
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
@@ -160,7 +152,7 @@ impl App {
 
     /// This is called every time a Message has been processed in [`Self::update`]
     fn view(&self) -> Element<Message> {
-        println!("{:?}", Instant::now());
+        println!("view()");
         let table = responsive(|size| {
             let mut table = table(
                 self.header.clone(),
@@ -214,11 +206,8 @@ impl Column {
             ColumnKind::Command => 400.0,
             ColumnKind::Started => 150.0,
 
-            ColumnKind::Index => 10.0,    // 60.0,
-            ColumnKind::Category => 10.0, // 100.0,
-            ColumnKind::Enabled => 10.0,  // 155.0,
-            ColumnKind::Notes => 10.0,    // 400.0,
-            ColumnKind::Delete => 10.0,   // 100.0,
+            ColumnKind::Index => 10.0,  // 60.0,
+            ColumnKind::Delete => 10.0, // 100.0,
         };
 
         Self {
@@ -240,45 +229,19 @@ enum ColumnKind {
     Started,
 
     Index,
-    Category,
-    Enabled,
-    Notes,
     Delete,
 }
 
 /// Actual storage for data row.
 struct Row {
     program_name: String,
-    pid: usize,
+    mem: u64,
+    cpu_perc: f32,
+    pid: i32,
     command: String,
-
-    notes: String,
-    category: Category,
-    is_enabled: bool,
-}
-
-impl Row {
-    fn generate(index: usize) -> Self {
-        let category = match index % 5 {
-            0 => Category::A,
-            1 => Category::B,
-            2 => Category::C,
-            3 => Category::D,
-            4 => Category::E,
-            _ => unreachable!(),
-        };
-        let is_enabled = index % 5 < 4;
-
-        Self {
-            program_name: "killa".to_string(),
-            pid: 42 + index,
-            command: "killa --version".to_string(),
-
-            notes: String::new(),
-            category,
-            is_enabled,
-        }
-    }
+    // notes: String,
+    // category: Category,
+    // is_enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -320,9 +283,6 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
             ColumnKind::Started => "Started",
 
             ColumnKind::Index => "Index",
-            ColumnKind::Category => "Category",
-            ColumnKind::Enabled => "Enabled",
-            ColumnKind::Notes => "Notes",
             ColumnKind::Delete => "",
         };
 
@@ -332,24 +292,13 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
     fn cell(&'a self, _col_index: usize, row_index: usize, row: &'a Row) -> Element<'a, Message> {
         let content: Element<_> = match self.kind {
             ColumnKind::Name => text!("{}", row.program_name).into(),
-            ColumnKind::Memory => text!("{} Mb", 100).into(),
-            ColumnKind::Cpu => text!("{} %", 10.0).into(),
+            ColumnKind::Memory => text!("{} MB", row.mem).into(),
+            ColumnKind::Cpu => text!("{} %", row.cpu_perc).into(),
             ColumnKind::Pid => text!("{}", row.pid).into(),
             ColumnKind::Command => text!("{}", row.command).into(),
             ColumnKind::Started => text!("{:?}", Instant::now()).into(),
 
             ColumnKind::Index => text(row_index).into(),
-            ColumnKind::Category => pick_list(Category::ALL, Some(row.category), move |category| {
-                Message::CategoryChange(row_index, category)
-            })
-            .into(),
-            ColumnKind::Enabled => checkbox("", row.is_enabled)
-                .on_toggle(move |enabled| Message::EnabledRow(row_index, enabled))
-                .into(),
-            ColumnKind::Notes => text_input("", &row.notes)
-                .on_input(move |notes| Message::EditNotes(row_index, notes))
-                .width(Length::Fill)
-                .into(),
             ColumnKind::Delete => button(text("Delete"))
                 .on_press(Message::DeleteRow(row_index))
                 .into(),
