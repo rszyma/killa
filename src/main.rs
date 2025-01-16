@@ -1,4 +1,5 @@
 use collector::init::init_collector;
+use core::num;
 use iced::widget::{
     button, checkbox, column, container, pick_list, responsive, scrollable, text, text_input,
 };
@@ -38,7 +39,6 @@ enum Message {
     Resizing(usize, f32),
     Resized,
     ResizeColumnsEnabled(bool),
-    MinWidthEnabled(bool),
     DarkThemeEnabled(bool),
     DeleteRow(usize),
 }
@@ -94,19 +94,8 @@ impl App {
                 dbg!("tock");
 
                 // todo: collect this only once
-                let num_of_cpu = match data
-                    .cpu
-                    .unwrap_or_default()
-                    .last()
-                    .unwrap_or(&bottom::data_collection::cpu::CpuData {
-                        data_type: bottom::data_collection::cpu::CpuDataType::Cpu(0),
-                        cpu_usage: 0.0,
-                    })
-                    .data_type
-                {
-                    bottom::data_collection::cpu::CpuDataType::Cpu(n) => n + 1,
-                    bottom::data_collection::cpu::CpuDataType::Avg => 0,
-                };
+                let num_of_cpu = num_cpus::get();
+                dbg!(num_of_cpu);
                 assert!(num_of_cpu > 0);
 
                 // dbg!(&data.list_of_batteries);
@@ -144,7 +133,6 @@ impl App {
                 }
             }),
             Message::ResizeColumnsEnabled(enabled) => self.resize_columns_enabled = enabled,
-            Message::MinWidthEnabled(enabled) => self.min_width_enabled = enabled,
             Message::DarkThemeEnabled(enabled) => {
                 if enabled {
                     self.theme = Theme::Dark;
@@ -175,17 +163,13 @@ impl App {
             if self.resize_columns_enabled {
                 table = table.on_column_resize(Message::Resizing, Message::Resized);
             }
-            if self.min_width_enabled {
-                table = table.min_width(size.width);
-            }
-
+            table = table.min_width(size.width); // this autoresizes table width to window
             table.into()
         });
 
         let content = column![
             checkbox("Resize Columns", self.resize_columns_enabled,)
                 .on_toggle(Message::ResizeColumnsEnabled),
-            checkbox("Min Width", self.min_width_enabled,).on_toggle(Message::MinWidthEnabled),
             checkbox("Dark Theme", matches!(self.theme, Theme::Dark),)
                 .on_toggle(Message::DarkThemeEnabled),
             table,

@@ -2281,6 +2281,7 @@ dependencies = [
  "iced_futures 0.13.2",
  "iced_native",
  "iced_table",
+ "num_cpus",
  "plotters-iced",
  "tokio",
 ]
