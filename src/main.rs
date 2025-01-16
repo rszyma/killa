@@ -25,6 +25,7 @@ use iced_table::table;
 // mod stream_ext;
 // mod subscription_filter_map;
 mod collector;
+mod keys;
 
 fn main() {
     iced::application(App::title, App::update, App::view)
@@ -37,7 +38,8 @@ fn main() {
 /// Messages that update UI.
 #[derive(Debug, Clone)]
 enum Message {
-    CollectedData(Arc<bottom::data_collection::Data>),
+    DummyTest,
+    CollectedData(Box<bottom::data_collection::Data>),
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
     Resized,
@@ -58,75 +60,11 @@ struct App {
     resize_columns_enabled: bool,
     min_width_enabled: bool,
     theme: Theme,
-    rx: Arc<Mutex<mpsc::Receiver<BottomEvent>>>,
 }
 
 impl Default for App {
     fn default() -> Self {
-        let cancellation_token =
-            Arc::new(bottom::utils::cancellation_token::CancellationToken::default());
-
-        let (tx, rx) = mpsc::channel(); // use iced mpsc?
-
-        let update_rate = 500; // min is 250 i think
-
-        let btm_config = bottom::app::AppConfigFields {
-            update_rate,
-            temperature_type: TemperatureType::Celsius,
-            show_average_cpu: true,
-            use_dot: true,
-            cpu_left_legend: true,
-            use_current_cpu_total: true,
-            unnormalized_cpu: false,
-            use_basic_mode: false,
-            default_time_value: 30 * 1000, // 30s
-            time_interval: 1000,
-            hide_time: true,
-            autohide_time: false,
-            use_old_network_legend: true,
-            table_gap: 5,
-            disable_click: true,
-            enable_gpu: false,
-            enable_cache_memory: false, // fixme: not sure what's this
-            show_table_scroll_position: false,
-            is_advanced_kill: false,
-            memory_legend_position: None,
-            network_legend_position: None,
-            network_scale_type: bottom::app::AxisScaling::Linear,
-            network_unit_type: bottom::utils::data_units::DataUnit::Bit,
-            network_use_binary_prefix: false,
-            retention_ms: 600000,
-            dedicated_average_row: false,
-        };
-
-        // Set up the event loop thread.
-        // Set it up early to speed up first access to data.
-        let _ = create_collection_thread(
-            tx.clone(),
-            mpsc::channel().1, // ignore msg channel for now
-            cancellation_token.clone(),
-            &btm_config,
-            DataFilters {
-                disk_filter: None,
-                mount_filter: None,
-                temp_filter: None,
-                net_filter: None,
-            },
-            bottom::app::layout_manager::UsedWidgets {
-                use_cpu: true,
-                use_mem: true,
-                use_cache: true,
-                use_gpu: true,
-                use_net: true,
-                use_proc: true,
-                use_disk: true,
-                use_temp: true,
-                use_battery: true,
-            },
-        );
-
         Self {
-            rx: Arc::new(rx.into()),
             columns: vec![
                 Column::new(ColumnKind::Name),
                 Column::new(ColumnKind::Memory),
@@ -161,14 +99,24 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let rx = self.rx.clone();
-        let col = collector::Collector::new(rx);
-        from_recipe(col).map(|x| Message::CollectedData(x.into()))
+        // let col = collector::Collector::new(rx);
+        // let sub = from_recipe(col).map(|x| Message::CollectedData(x.into()));
         // Subscription::none(),
+        // Return the subscription
+        // unfold(col, |state| async move { Some((col.next(), col)) })
+        use crate::collector::colv2::some_worker;
+        Subscription::run(some_worker).map(|event| match event {
+            collector::colv2::Event::Ready(_sender) => Message::DummyTest,
+            collector::colv2::Event::DataReady(data) => Message::CollectedData(data),
+            collector::colv2::Event::WorkFinished => Message::DummyTest,
+        })
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::DummyTest => {
+                dbg!("testing 123");
+            }
             Message::CollectedData(data) => {
                 dbg!("tock");
                 dbg!(&data.list_of_batteries);

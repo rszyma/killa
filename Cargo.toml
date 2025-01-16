@@ -18,14 +18,16 @@ members = [
 bottom = { path = "./crates/bottom" }
 bytesize.workspace = true
 iced.workspace = true
-iced_futures = "0.13.2"
+iced_futures = "0.13.1"
+iced_native = "0.10.3"
 iced_table.workspace = true
+plotters-iced = "0.11.0"
 tokio = "1.43.0"
 
 [workspace.dependencies]
 bytesize = "1.1"
 iced = { version = "0.13.1", features = [
-    "system", "lazy", "tokio",
+    "system", "lazy", "tokio", "canvas"
     # "logging"
     # "debug"
 ] }

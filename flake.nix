@@ -42,7 +42,9 @@
             fontconfig
             freetype
             libGL
-            # xorg
+            xorg.libX11
+            xorg.libXi
+            xorg.libXtst
             libxkbcommon
             vulkan-loader
             wayland
