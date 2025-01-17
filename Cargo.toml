@@ -10,24 +10,18 @@ publish = false
 [workspace]
 members = [
     ".",
-    "examples/*",
     "crates/*",
 ]
 
 [dependencies]
 bottom = { path = "./crates/bottom" }
-bytesize.workspace = true
-iced.workspace = true
+bytesize = "1.1"
 iced_core = "0.13.2"
 iced_futures = "0.13.1"
-iced_native = "0.10.3"
-iced_table.workspace = true
 num_cpus = "1.16.0"
 plotters-iced = "0.11.0"
-tokio = "1.43.0"
+tokio = { version = "1.43.0", features = ["time"] }
 
-[workspace.dependencies]
-bytesize = "1.1"
 iced = { version = "0.13.1", features = [
     "system", "lazy", "tokio", "canvas"
     # "logging"
@@ -38,10 +32,6 @@ iced = { version = "0.13.1", features = [
 # when just moving mouse around.
 #  https://github.com/iced-rs/iced/pull/2662
 iced_table = "0.13.0"
-
-[workspace.dependencies.tokio]
-workspace = true
-features = ["time"]
 
 # + auto-detect-theme
 # + fira-sans

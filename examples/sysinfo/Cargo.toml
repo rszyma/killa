@@ -1,9 +1,0 @@
-[package]
-name = "example-sysinfo"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-iced_table = { workspace = true }
-iced = { workspace = true }
-bytesize = { workspace = true }
