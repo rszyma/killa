@@ -9,12 +9,14 @@ use iced::{
 };
 use iced_core::widget::operation;
 use iced_table::table::{self};
+use process_data::{KillaData, ProcessListSort, SortOrder};
 use std::fmt;
 use std::sync::mpsc::Receiver;
 use std::time::Instant;
 
 mod collector;
 mod keyboard_thingy;
+mod process_data;
 
 fn main() {
     // Set collections thread as early as possible, to speed up first access to data.
@@ -53,11 +55,11 @@ fn init(collector_rx: Receiver<BottomEvent>) -> impl FnOnce() -> (App, iced::Tas
 }
 
 #[derive(Debug, Clone)]
-enum InputboxAction {
+enum TextInputAction {
     Append(String),
     Backspace,
     Replace(String),
-    SelectAll,
+    Toggle,
     Hide,
 }
 
@@ -71,8 +73,7 @@ enum Message {
     ResizeColumnsEnabled(bool),
     DarkThemeEnabled(bool),
     DeleteRow(usize),
-    // FocusSearch(keyboard::Event),
-    Search(InputboxAction),
+    Search(TextInputAction),
 }
 
 struct App {
@@ -83,6 +84,8 @@ struct App {
     resize_columns_enabled: bool,
     theme: Theme,
     search: Option<String>,
+    sort: ProcessListSort,
+    last_data: KillaData,
 }
 
 impl Default for App {
@@ -102,6 +105,11 @@ impl Default for App {
             resize_columns_enabled: true,
             theme: Theme::Light,
             search: None,
+            sort: ProcessListSort {
+                column: ColumnKind::Cpu,
+                order: SortOrder::default(),
+            },
+            last_data: KillaData::default(),
         }
     }
 }
@@ -128,11 +136,11 @@ impl App {
                     match key {
                         T::Character(c) => {
                             if modifiers.control() && (c == "f") {
-                                return Some(Message::Search(InputboxAction::Hide));
+                                return Some(Message::Search(TextInputAction::Hide));
                             }
                         }
                         T::Named(K::Escape) => {
-                            return Some(Message::Search(InputboxAction::Hide));
+                            return Some(Message::Search(TextInputAction::Hide));
                         }
                         _ => {}
                     }
@@ -144,13 +152,13 @@ impl App {
             if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
                 match key {
                     T::Named(K::Backspace) => {
-                        return Some(Message::Search(InputboxAction::Backspace))
+                        return Some(Message::Search(TextInputAction::Backspace))
                     }
                     T::Character(c) => {
                         if modifiers.control() && (c == "f") {
-                            return Some(Message::Search(InputboxAction::SelectAll));
+                            return Some(Message::Search(TextInputAction::Toggle));
                         } else {
-                            return Some(Message::Search(InputboxAction::Append(c.to_string())));
+                            return Some(Message::Search(TextInputAction::Append(c.to_string())));
                         };
                     }
                     _ => {}
@@ -165,50 +173,45 @@ impl App {
         match message {
             Message::Search(ev) => {
                 match ev {
-                    InputboxAction::Append(s) => match &mut self.search {
+                    TextInputAction::Append(s) => match &mut self.search {
                         Some(text) => text.push_str(&s),
                         None => {
                             self.search.replace(s);
                         }
                     },
-                    InputboxAction::Replace(s) => {
+                    TextInputAction::Replace(s) => {
                         let _ = self.search.insert(s);
                     }
-                    InputboxAction::Backspace => {
+                    TextInputAction::Backspace => {
                         if let Some(x) = &mut self.search {
                             x.pop();
                         }
                     }
-                    InputboxAction::SelectAll => {
-                        let _ = self.search.insert("".into());
-                        return text_input::focus(SEARCH_INPUT_ID)
-                            .chain(text_input::select_all(SEARCH_INPUT_ID));
-                    }
-                    InputboxAction::Hide => {
+                    TextInputAction::Toggle => match &self.search {
+                        Some(_) => {
+                            self.filter_rows();
+                            self.search.take();
+                        }
+                        None => {
+                            let _ = self.search.insert("".into());
+                            return text_input::focus(SEARCH_INPUT_ID)
+                                .chain(text_input::select_all(SEARCH_INPUT_ID));
+                        }
+                    },
+                    TextInputAction::Hide => {
                         self.search.take();
+                        self.filter_rows();
                         return Task::none();
                     }
                 };
+                self.filter_rows();
                 return text_input::focus(SEARCH_INPUT_ID);
             }
             Message::CollectedData(data) => {
-                // dbg!(&data.list_of_batteries);
-                let rows: &mut Vec<Row> = self.rows.as_mut();
-                *rows = data
-                    .list_of_processes
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|ps| Row {
-                        program_name: ps.name.clone(),
-                        mem: ps.mem_usage_bytes / 1_000_000,
-                        cpu_perc: (((ps.cpu_usage_percent) / (num_cpus::get() as f32) * 10.0)
-                            as i32) as f32
-                            / 10.0,
-                        pid: ps.pid,
-                        command: ps.command.clone(),
-                    })
-                    .collect();
-                rows.sort_by_key(|row| (100 * 10000) - (row.cpu_perc * 10000.0f32) as u32);
+                let kd = KillaData::from(data);
+                self.last_data = kd;
+                self.sort_rows();
+                self.filter_rows();
             }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
@@ -274,7 +277,7 @@ impl App {
         if let Some(search_text) = &self.search {
             // let no_widget = Space::new(0, 0);
             let search_box = text_input("Search processes", search_text)
-                .on_input(|text| Message::Search(InputboxAction::Replace(text)))
+                .on_input(|text| Message::Search(TextInputAction::Replace(text)))
                 .id(text_input::Id::new(SEARCH_INPUT_ID));
             topbar_items.push(search_box.into());
         };
@@ -288,6 +291,22 @@ impl App {
             .center_x(Length::Fill)
             .center_y(Length::Fill)
             .into()
+    }
+
+    fn filter_rows(&mut self) {
+        self.rows.clear();
+        let a = self.last_data.clone();
+        let a = match &self.search {
+            Some(phrase) => a.search(phrase),
+            None => a,
+        };
+        let a: Vec<Row> = a.into();
+        self.rows.extend(a);
+    }
+
+    fn sort_rows(&mut self) {
+        let ProcessListSort { column, order } = self.sort;
+        self.last_data.sort_by_column(column, order);
     }
 }
 
@@ -319,8 +338,7 @@ impl Column {
     }
 }
 
-// name, memory, CPU, pid, command line, started
-
+#[derive(Clone, Copy)]
 enum ColumnKind {
     Name,
     Memory,
@@ -334,6 +352,7 @@ enum ColumnKind {
 }
 
 /// Actual storage for data row.
+#[derive(Clone)]
 struct Row {
     program_name: String,
     mem: u64,
