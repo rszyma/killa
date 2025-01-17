@@ -18,6 +18,7 @@ members = [
 bottom = { path = "./crates/bottom" }
 bytesize.workspace = true
 iced.workspace = true
+iced_core = "0.13.2"
 iced_futures = "0.13.1"
 iced_native = "0.10.3"
 iced_table.workspace = true

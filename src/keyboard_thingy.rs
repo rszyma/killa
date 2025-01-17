@@ -8,27 +8,27 @@ use iced_futures::futures::Stream;
 use iced_futures::stream;
 use tokio::time::sleep;
 
-pub enum Event {
-    Ready(mpsc::Sender<Input>),
+pub enum Event2 {
+    Ready(mpsc::Sender<Input2>),
     WorkFinished,
     DataReady(Box<bottom::data_collection::Data>),
     // ...
 }
 
 #[derive(Debug)]
-pub enum Input {
+pub enum Input2 {
     DoSomeWork,
     // ...
 }
 
 // currently this panics, idk
-pub fn some_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event> {
+pub fn some_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event2> {
     stream::channel(100, |mut output| async move {
         // Create channel for communication back to app.
         let (sender, receiver) = mpsc::channel(100);
 
         // Send the sender back to the application
-        output.send(Event::Ready(sender)).await;
+        output.send(Event2::Ready(sender)).await;
 
         loop {
             // use iced_futures::futures::StreamExt;
@@ -38,7 +38,7 @@ pub fn some_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Ev
 
             if let Ok(BottomEvent::Update(data)) = collector_rx.try_recv() {
                 // println!("sending data!");
-                output.send(Event::DataReady(data)).await;
+                output.send(Event2::DataReady(data)).await;
                 continue;
             }
             sleep(Duration::from_millis(25)).await;

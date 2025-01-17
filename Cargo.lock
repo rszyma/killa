@@ -2278,6 +2278,7 @@ dependencies = [
  "bottom",
  "bytesize",
  "iced",
+ "iced_core 0.13.2",
  "iced_futures 0.13.2",
  "iced_native",
  "iced_table",

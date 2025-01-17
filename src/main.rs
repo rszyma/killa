@@ -1,13 +1,20 @@
 use crate::collector::colv2::some_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
-use iced::widget::{button, checkbox, column, container, responsive, scrollable, text};
-use iced::{Element, Font, Length, Pixels, Renderer, Task, Theme};
-use iced_table::table;
+use iced::widget::{
+    self, button, checkbox, column, container, responsive, row, scrollable, text, text_input, Space,
+};
+use iced::{
+    event, keyboard, Element, Event, Font, Length, Pixels, Renderer, Subscription, Task, Theme,
+};
+use iced_core::widget::operation;
+use iced_table::table::{self};
 use std::fmt;
 use std::sync::mpsc::Receiver;
 use std::time::Instant;
+
 mod collector;
+mod keyboard_thingy;
 
 fn main() {
     // Set collections thread as early as possible, to speed up first access to data.
@@ -18,6 +25,7 @@ fn main() {
             weight: iced::font::Weight::Medium,
             ..Default::default()
         })
+        .subscription(App::subscription)
         .run_with(init(collector_rx))
         .unwrap()
 }
@@ -29,8 +37,28 @@ fn init(collector_rx: Receiver<BottomEvent>) -> impl FnOnce() -> (App, iced::Tas
             collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
             collector::colv2::Event::WorkFinished => Task::none(),
         });
-        (App::default(), init_collector_task)
+        // let subscribe_to_keyboard = Task::stream(keyboard_event_producer()).then(|ev| match ev {
+        //     collector::colv2::Event::Ready(_sender) => Task::none(),
+        //     collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
+        //     collector::colv2::Event::WorkFinished => Task::none(),
+        // });
+        (
+            App::default(),
+            Task::batch(vec![
+                init_collector_task,
+                // subscribe_to_keyboard,
+            ]),
+        )
     }
+}
+
+#[derive(Debug, Clone)]
+enum InputboxAction {
+    Append(String),
+    Backspace,
+    Replace(String),
+    SelectAll,
+    Hide,
 }
 
 /// Messages that update UI.
@@ -43,6 +71,8 @@ enum Message {
     ResizeColumnsEnabled(bool),
     DarkThemeEnabled(bool),
     DeleteRow(usize),
+    // FocusSearch(keyboard::Event),
+    Search(InputboxAction),
 }
 
 struct App {
@@ -52,6 +82,7 @@ struct App {
     body: scrollable::Id,
     resize_columns_enabled: bool,
     theme: Theme,
+    search: Option<String>,
 }
 
 impl Default for App {
@@ -63,16 +94,19 @@ impl Default for App {
                 Column::new(ColumnKind::Cpu),
                 Column::new(ColumnKind::Pid),
                 Column::new(ColumnKind::Command),
-                Column::new(ColumnKind::Started),
+                // Column::new(ColumnKind::Started),
             ],
             rows: vec![],
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
             resize_columns_enabled: true,
             theme: Theme::Light,
+            search: None,
         }
     }
 }
+
+const SEARCH_INPUT_ID: &str = "global-search";
 
 impl App {
     fn title(&self) -> String {
@@ -83,13 +117,80 @@ impl App {
         self.theme.clone()
     }
 
-    // fn subscription(&self) -> Subscription<Message> {
-    //     // I've no idea how to control frequency of subscriptions calls...
-    //     Subscription::none()
-    // }
+    fn subscription(&self) -> Subscription<Message> {
+        event::listen_with(|event, status, _window| -> Option<Message> {
+            use keyboard::key::Named as K;
+            use keyboard::Key as T;
+
+            if let event::Status::Captured = status {
+                // Shortcuts in search box active
+                if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
+                    match key {
+                        T::Character(c) => {
+                            if modifiers.control() && (c == "f") {
+                                return Some(Message::Search(InputboxAction::Hide));
+                            }
+                        }
+                        T::Named(K::Escape) => {
+                            return Some(Message::Search(InputboxAction::Hide));
+                        }
+                        _ => {}
+                    }
+                };
+                return None;
+            };
+
+            // Out-of-search-box keyboard shortcuts.
+            if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
+                match key {
+                    T::Named(K::Backspace) => {
+                        return Some(Message::Search(InputboxAction::Backspace))
+                    }
+                    T::Character(c) => {
+                        if modifiers.control() && (c == "f") {
+                            return Some(Message::Search(InputboxAction::SelectAll));
+                        } else {
+                            return Some(Message::Search(InputboxAction::Append(c.to_string())));
+                        };
+                    }
+                    _ => {}
+                }
+            };
+
+            None
+        })
+    }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::Search(ev) => {
+                match ev {
+                    InputboxAction::Append(s) => match &mut self.search {
+                        Some(text) => text.push_str(&s),
+                        None => {
+                            self.search.replace(s);
+                        }
+                    },
+                    InputboxAction::Replace(s) => {
+                        let _ = self.search.insert(s);
+                    }
+                    InputboxAction::Backspace => {
+                        if let Some(x) = &mut self.search {
+                            x.pop();
+                        }
+                    }
+                    InputboxAction::SelectAll => {
+                        let _ = self.search.insert("".into());
+                        return text_input::focus(SEARCH_INPUT_ID)
+                            .chain(text_input::select_all(SEARCH_INPUT_ID));
+                    }
+                    InputboxAction::Hide => {
+                        self.search.take();
+                        return Task::none();
+                    }
+                };
+                return text_input::focus(SEARCH_INPUT_ID);
+            }
             Message::CollectedData(data) => {
                 // dbg!(&data.list_of_batteries);
                 let rows: &mut Vec<Row> = self.rows.as_mut();
@@ -145,7 +246,7 @@ impl App {
     fn view(&self) -> Element<Message> {
         // println!("view()");
         let table = responsive(|size| {
-            let mut table = table(
+            let mut table = iced_table::table(
                 self.header.clone(),
                 self.body.clone(),
                 &self.columns,
@@ -160,14 +261,27 @@ impl App {
             table.into()
         });
 
-        let content = column![
+        let topbar_left = column![
             checkbox("Resize Columns", self.resize_columns_enabled,)
                 .on_toggle(Message::ResizeColumnsEnabled),
             checkbox("Dark Theme", matches!(self.theme, Theme::Dark),)
                 .on_toggle(Message::DarkThemeEnabled),
-            table,
         ]
         .spacing(6);
+
+        let mut topbar_items: Vec<iced_core::Element<Message, _, _>> = vec![topbar_left.into()];
+
+        if let Some(search_text) = &self.search {
+            // let no_widget = Space::new(0, 0);
+            let search_box = text_input("Search processes", search_text)
+                .on_input(|text| Message::Search(InputboxAction::Replace(text)))
+                .id(text_input::Id::new(SEARCH_INPUT_ID));
+            topbar_items.push(search_box.into());
+        };
+
+        let topbar = iced::widget::Row::from_iter(topbar_items).spacing(6);
+
+        let content = column![topbar, table].spacing(6);
 
         container(container(content).width(Length::Fill).height(Length::Fill))
             .padding(20)
