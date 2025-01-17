@@ -1,21 +1,16 @@
-use crate::collector::colv2::some_worker;
+use crate::collector::colv2::run_collector_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
-use iced::widget::{
-    self, button, checkbox, column, container, responsive, row, scrollable, text, text_input, Space,
-};
+use iced::widget::{button, checkbox, column, container, responsive, scrollable, text, text_input};
 use iced::{
     event, keyboard, Element, Event, Font, Length, Pixels, Renderer, Subscription, Task, Theme,
 };
-use iced_core::widget::operation;
 use iced_table::table::{self};
 use process_data::{KillaData, ProcessListSort, SortOrder};
-use std::fmt;
 use std::sync::mpsc::Receiver;
 use std::time::Instant;
 
 mod collector;
-mod keyboard_thingy;
 mod process_data;
 
 fn main() {
@@ -34,23 +29,15 @@ fn main() {
 
 fn init(collector_rx: Receiver<BottomEvent>) -> impl FnOnce() -> (App, iced::Task<Message>) {
     || {
-        let init_collector_task = Task::stream(some_worker(collector_rx)).then(|ev| match ev {
-            collector::colv2::Event::Ready(_sender) => Task::none(),
-            collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
-            collector::colv2::Event::WorkFinished => Task::none(),
-        });
-        // let subscribe_to_keyboard = Task::stream(keyboard_event_producer()).then(|ev| match ev {
-        //     collector::colv2::Event::Ready(_sender) => Task::none(),
-        //     collector::colv2::Event::DataReady(data) => Task::done(Message::CollectedData(data)),
-        //     collector::colv2::Event::WorkFinished => Task::none(),
-        // });
-        (
-            App::default(),
-            Task::batch(vec![
-                init_collector_task,
-                // subscribe_to_keyboard,
-            ]),
-        )
+        let init_collector_task =
+            Task::stream(run_collector_worker(collector_rx)).then(|ev| match ev {
+                collector::colv2::Event::Ready(_sender) => Task::none(),
+                collector::colv2::Event::DataReady(data) => {
+                    Task::done(Message::CollectedData(data))
+                }
+                collector::colv2::Event::WorkFinished => Task::none(),
+            });
+        (App::default(), Task::batch(vec![init_collector_task]))
     }
 }
 
@@ -339,7 +326,7 @@ impl Column {
 }
 
 #[derive(Clone, Copy)]
-enum ColumnKind {
+pub enum ColumnKind {
     Name,
     Memory,
     Cpu,
@@ -362,32 +349,6 @@ struct Row {
     // notes: String,
     // category: Category,
     // is_enabled: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Category {
-    A,
-    B,
-    C,
-    D,
-    E,
-}
-
-impl Category {
-    const ALL: &'static [Self] = &[Self::A, Self::B, Self::C, Self::D, Self::E];
-}
-
-impl fmt::Display for Category {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Category::A => "A",
-            Category::B => "B",
-            Category::C => "C",
-            Category::D => "D",
-            Category::E => "E",
-        }
-        .fmt(f)
-    }
 }
 
 impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
