@@ -18,8 +18,8 @@ pub fn init_collector() -> std::sync::mpsc::Receiver<bottom::event::BottomEvent>
         show_average_cpu: true,
         use_dot: true,
         cpu_left_legend: true,
-        use_current_cpu_total: true,
-        unnormalized_cpu: false,
+        use_current_cpu_total: false, // don't enable, it's smh fuckes up numbers
+        unnormalized_cpu: true,
         use_basic_mode: false,
         default_time_value: 30 * 1000, // 30s
         time_interval: 1000,
