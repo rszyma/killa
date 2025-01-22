@@ -54,7 +54,7 @@ pub fn init_collector() -> std::sync::mpsc::Receiver<bottom::event::BottomEvent>
         bottom::app::layout_manager::UsedWidgets {
             use_proc: true,
             use_cpu: false,
-            use_mem: false,
+            use_mem: true,
             use_cache: false,
             use_gpu: false,
             use_net: false,

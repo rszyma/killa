@@ -1,25 +1,37 @@
 use crate::collector::colv2::run_collector_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
-use iced::widget::{button, checkbox, column, container, responsive, scrollable, text, text_input};
+use iced::alignment::{Horizontal, Vertical};
+use iced::widget::{
+    button, checkbox, column, container, responsive, row, scrollable, text, text_input,
+};
+use iced::window::{self};
 use iced::{
-    event, keyboard, Element, Event, Font, Length, Pixels, Renderer, Subscription, Task, Theme,
+    event, keyboard, Color, Element, Event, Font, Length, Pixels, Renderer, Size, Subscription,
+    Task, Theme,
 };
 use iced_table::table::{self};
 use process_data::{KillaData, ProcessListSort, SortOrder};
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
+use std::time::Duration;
 
+mod collect_uptimes;
 mod collector;
 mod process_data;
 
 fn main() {
     // Set collections thread as early as possible, to speed up first access to data.
     let collector_rx = init_collector();
+
     iced::application(App::title, App::update, App::view)
         .theme(App::theme)
         .default_font(Font {
             weight: iced::font::Weight::Medium,
+            ..Default::default()
+        })
+        .window(window::Settings {
+            size: Size::new(1024.0, 512.0),
+            // icon: todo!(),
             ..Default::default()
         })
         .subscription(App::subscription)
@@ -58,7 +70,7 @@ enum Message {
     Resizing(usize, f32),
     Resized,
     ResizeColumnsEnabled(bool),
-    DarkThemeEnabled(bool),
+    WireframeToggled(bool),
     DeleteRow(usize),
     Search(TextInputAction),
 }
@@ -73,6 +85,7 @@ struct App {
     search: Option<String>,
     sort: ProcessListSort,
     last_data: KillaData,
+    enable_wireframe: bool,
 }
 
 impl Default for App {
@@ -83,20 +96,22 @@ impl Default for App {
                 Column::new(ColumnKind::Memory),
                 Column::new(ColumnKind::Cpu),
                 Column::new(ColumnKind::Pid),
+                // Column::new(ColumnKind::CpuTime),
+                // Column::new(ColumnKind::Started), // todo
                 Column::new(ColumnKind::Command),
-                // Column::new(ColumnKind::Started),
             ],
             rows: vec![],
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
             resize_columns_enabled: true,
-            theme: Theme::Light,
+            theme: Theme::Dark,
             search: None,
             sort: ProcessListSort {
                 column: ColumnKind::Cpu,
                 order: SortOrder::default(),
             },
             last_data: KillaData::default(),
+            enable_wireframe: false,
         }
     }
 }
@@ -217,13 +232,7 @@ impl App {
                 }
             }),
             Message::ResizeColumnsEnabled(enabled) => self.resize_columns_enabled = enabled,
-            Message::DarkThemeEnabled(enabled) => {
-                if enabled {
-                    self.theme = Theme::Dark;
-                } else {
-                    self.theme = Theme::Light;
-                }
-            }
+            Message::WireframeToggled(enabled) => self.enable_wireframe = enabled,
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
@@ -252,32 +261,63 @@ impl App {
         });
 
         let topbar_left = column![
-            checkbox("Resize Columns", self.resize_columns_enabled,)
+            checkbox("Resize Columns", self.resize_columns_enabled)
                 .on_toggle(Message::ResizeColumnsEnabled),
-            checkbox("Dark Theme", matches!(self.theme, Theme::Dark),)
-                .on_toggle(Message::DarkThemeEnabled),
+            checkbox("Enable Wireframe", self.enable_wireframe)
+                .on_toggle(Message::WireframeToggled),
         ]
         .spacing(6);
 
-        let mut topbar_items: Vec<iced_core::Element<Message, _, _>> = vec![topbar_left.into()];
+        let total_memory_usage = {
+            let used = (self.last_data.memory.used_bytes as f64) / 1_000_000_000.0;
+            let total = (self.last_data.memory.total_bytes as f64) / 1_000_000_000.0;
+            let percent = self.last_data.memory.checked_percent().unwrap_or_default();
+            iced::widget::text(format!(
+                "Memory: {:.1} GB ({:.1}%) of {:.0} GB",
+                used, percent, total,
+            ))
+        };
+
+        let mut topbar = row![topbar_left].spacing(6);
 
         if let Some(search_text) = &self.search {
-            // let no_widget = Space::new(0, 0);
             let search_box = text_input("Search processes", search_text)
                 .on_input(|text| Message::Search(TextInputAction::Replace(text)))
                 .id(text_input::Id::new(SEARCH_INPUT_ID));
-            topbar_items.push(search_box.into());
-        };
+            topbar = topbar.push(container(search_box).padding(10).align_y(Vertical::Center));
+        } else {
+            topbar = topbar.push(container("").width(Length::Fill));
+        }
 
-        let topbar = iced::widget::Row::from_iter(topbar_items).spacing(6);
+        // iced::widget::vertical_rule(1).into()
+        topbar = topbar.push(
+            container(
+                total_memory_usage
+                    .align_y(Vertical::Center)
+                    // .align_x(Horizontal::Center)
+                    .width(Length::Shrink)
+                    .height(Length::Fill),
+            )
+            .height(Length::Fixed(50.0))
+            .align_x(Horizontal::Center)
+            .width(Length::Fill)
+            .padding(10),
+        );
 
         let content = column![topbar, table].spacing(6);
 
-        container(container(content).width(Length::Fill).height(Length::Fill))
-            .padding(20)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
+        let all: Element<_> =
+            container(container(content).width(Length::Fill).height(Length::Fill))
+                .padding(20)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
+                .into();
+
+        if self.enable_wireframe {
+            all.explain(Color::from_rgb8(255, 0, 0))
+        } else {
+            all
+        }
     }
 
     fn filter_rows(&mut self) {
@@ -311,7 +351,8 @@ impl Column {
             ColumnKind::Cpu => 60.0,
             ColumnKind::Pid => 80.0,
             ColumnKind::Command => 400.0,
-            ColumnKind::Started => 150.0,
+            ColumnKind::CpuTime => 100.0,
+            ColumnKind::Started => 100.0,
 
             ColumnKind::Index => 10.0,  // 60.0,
             ColumnKind::Delete => 10.0, // 100.0,
@@ -333,6 +374,7 @@ pub enum ColumnKind {
     Pid,
     Command,
     Started,
+    CpuTime,
 
     Index,
     Delete,
@@ -346,9 +388,8 @@ struct Row {
     cpu_perc: f32,
     pid: i32,
     command: String,
-    // notes: String,
-    // category: Category,
-    // is_enabled: bool,
+    cpu_time: Duration,
+    // start_time: Option<chrono::DateTime<chrono::Local>>,
 }
 
 impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
@@ -360,8 +401,11 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
             ColumnKind::Memory => "Memory",
             ColumnKind::Cpu => "CPU",
             ColumnKind::Pid => "ID",
-            ColumnKind::Command => "Command",
+            ColumnKind::CpuTime => "Time",
+
             ColumnKind::Started => "Started",
+
+            ColumnKind::Command => "Command",
 
             ColumnKind::Index => "Index",
             ColumnKind::Delete => "",
@@ -371,14 +415,29 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
     }
 
     fn cell(&'a self, _col_index: usize, row_index: usize, row: &'a Row) -> Element<'a, Message> {
+        // let a = humantime::format_duration(val);
+
         let font_size = Pixels::from(13.0);
         let content: Element<_> = match self.kind {
             ColumnKind::Name => text!("{}", row.program_name).size(font_size).into(),
             ColumnKind::Memory => text!("{} MB", row.mem).size(font_size).into(),
-            ColumnKind::Cpu => text!("{} %", row.cpu_perc).size(font_size).into(),
+            ColumnKind::Cpu => text!("{:.1} %", row.cpu_perc).size(font_size).into(),
             ColumnKind::Pid => text!("{}", row.pid).size(font_size).into(),
             ColumnKind::Command => text!("{}", row.command).size(font_size).into(),
-            ColumnKind::Started => text!("{:?}", Instant::now()).size(font_size).into(),
+            ColumnKind::Started => text!("{}", {
+                // TODO: optimize for startup times.
+                // Current implementation is pretty detrimental with the Mutex, it probably adds like 100ms.
+                // Maybe pre-fetch the process start times?
+                // get_process_start_time(row.pid)
+                //     .unwrap_or_default()
+                //     .format("%d/%m/%Y %H:%M")
+                "-"
+            })
+            .size(font_size)
+            .into(),
+            ColumnKind::CpuTime => text!("{}", humantime::format_duration(row.cpu_time))
+                .size(font_size)
+                .into(),
 
             ColumnKind::Index => text(row_index).size(font_size).into(),
             ColumnKind::Delete => button(text("Delete").size(font_size))

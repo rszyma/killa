@@ -22,7 +22,11 @@ some shortcut to open submenu with sorting? or just use 1,2,3,4,5 for name,cpu,m
     - another idea is for options to export git patch since last change (lmao),
       and you can indicate where to what nix file to apply the patch
 
+pretty urgent todo (in order)
+- [ ] show total memory usage in % at top bar
+- [ ] sort secondary values (those that are currently 0% cpu) in order of earlier being higher.
+
 ################################
 # versions 0.2.0-and-later:
 process icons (like in gsm)
-color cpu/mem in red more, higher the usage (smth like )9i8
+color cpu/mem in red more, higher the usage (smth like )

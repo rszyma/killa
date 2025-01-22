@@ -1,8 +1,11 @@
+use bottom::data_collection::memory::MemHarvest;
+
 #[derive(Clone, Default)]
 pub struct KillaData {
     // todo: optimization by keeping a field of ordered ones?
     rows: Vec<crate::Row>,
     // todo: should we keep the original data? I mean this will hold original data, no?
+    pub memory: MemHarvest,
 }
 
 impl From<Box<bottom::data_collection::Data>> for KillaData {
@@ -19,27 +22,26 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
                     / 10.0,
                 pid: ps.pid,
                 command: ps.command.clone(),
+                cpu_time: ps.time,
             })
             .collect();
-        Self { rows }
+        Self {
+            rows,
+            memory: data.memory.unwrap_or_default(),
+        }
     }
 }
 
 impl KillaData {
-    pub fn search(self, search_phrase: &str) -> Self {
-        Self {
-            rows: self
-                .rows
-                .into_iter()
-                .filter(|x| {
-                    // NOTE: for now this is basic filter, without results ranking.
-                    // We might want to implement something better in the future.
-                    x.program_name.contains(search_phrase)
-                        || x.command.contains(search_phrase)
-                        || format!("{}", x.pid).contains(search_phrase)
-                })
-                .collect(),
-        }
+    pub fn search(mut self, search_phrase: &str) -> Self {
+        self.rows.retain(|x| {
+            // NOTE: for now this is basic filter, without results ranking.
+            // We might want to implement something better in the future.
+            x.program_name.contains(search_phrase)
+                || x.command.contains(search_phrase)
+                || format!("{}", x.pid).contains(search_phrase)
+        });
+        self
     }
 
     pub fn sort_by_column(&mut self, col: crate::ColumnKind, order: SortOrder) -> &mut Self {
@@ -56,6 +58,7 @@ impl KillaData {
             },
             crate::ColumnKind::Pid => {}
             crate::ColumnKind::Command => {}
+            crate::ColumnKind::CpuTime => {}
             crate::ColumnKind::Started => {}
             crate::ColumnKind::Index => {}
             crate::ColumnKind::Delete => {}

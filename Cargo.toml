@@ -32,6 +32,12 @@ iced = { version = "0.13.1", features = [
 # when just moving mouse around.
 #  https://github.com/iced-rs/iced/pull/2662
 iced_table = "0.13.0"
+humantime = "2.1.0"
+procfs = { version = "0.17.0", features = [ "chrono" ] }
+chrono = "0.4.39"
+rustix = "0.38.44"
+anyhow = "1.0.95"
+sysinfo = "0.33.1"
 
 # + auto-detect-theme
 # + fira-sans
