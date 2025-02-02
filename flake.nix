@@ -41,14 +41,17 @@
           makeWrapper
         ];
         buildInputs = with pkgs; [
-          # these 3 are absolutely necessary, idk about the rest
+          # these 3 are absolutely necessary
           libxkbcommon
           vulkan-loader
           wayland
 
+          # TODO: are these 3 needed?
           fontconfig
           freetype
           libGL
+
+          # deps for X only.
           xorg.libX11
           xorg.libXi
           xorg.libXtst
@@ -89,14 +92,9 @@
             paths = [ killaCrate ];
             buildInputs = [ pkgs.makeWrapper ];
             postBuild = ''
-              wrapProgram $out/bin/killa --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath (with pkgs; [
-                libxkbcommon
-                vulkan-loader
-                wayland
-              ])} --set PATH $out/bin
+              wrapProgram $out/bin/killa --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath buildInputs} --set PATH $out/bin
             '';
           };
-
 
         mkScript = name: text: (pkgs.writeShellScriptBin name text);
         devshellScripts = [
