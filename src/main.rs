@@ -2,8 +2,9 @@ use crate::collector::colv2::run_collector_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
 use iced::alignment::{Horizontal, Vertical};
+use iced::widget::tooltip::Position;
 use iced::widget::{
-    button, checkbox, column, container, responsive, row, scrollable, text, text_input,
+    button, checkbox, column, container, responsive, row, scrollable, text, text_input, tooltip,
 };
 use iced::window::{self};
 use iced::{
@@ -418,12 +419,33 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
         // let a = humantime::format_duration(val);
 
         let font_size = Pixels::from(13.0);
+        let tooltip_font_size = Pixels::from(11.0);
         let content: Element<_> = match self.kind {
             ColumnKind::Name => text!("{}", row.program_name).size(font_size).into(),
             ColumnKind::Memory => text!("{} MB", row.mem).size(font_size).into(),
             ColumnKind::Cpu => text!("{:.1} %", row.cpu_perc).size(font_size).into(),
             ColumnKind::Pid => text!("{}", row.pid).size(font_size).into(),
-            ColumnKind::Command => text!("{}", row.command).size(font_size).into(),
+            ColumnKind::Command => tooltip(
+                text!("{}", row.command).size(font_size),
+                container(text!("{}", row.command).size(tooltip_font_size))
+                    .padding(10)
+                    .style(|theme: &Theme| {
+                        let palette = theme.extended_palette();
+                        let color_set = palette.background.weak;
+                        let alpha = 0.99;
+                        iced::widget::container::Style {
+                            background: Some(color_set.color.scale_alpha(alpha).into()),
+                            text_color: Some(color_set.text.scale_alpha(alpha)),
+                            border: iced::border::rounded(5)
+                                .color(palette.secondary.weak.color)
+                                .width(1.5),
+                            ..Default::default()
+                        }
+                    })
+                    .max_width(700),
+                Position::Bottom,
+            )
+            .into(),
             ColumnKind::Started => text!("{}", {
                 // TODO: optimize for startup times.
                 // Current implementation is pretty detrimental with the Mutex, it probably adds like 100ms.
