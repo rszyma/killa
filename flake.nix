@@ -55,6 +55,7 @@
           xorg.libX11
           xorg.libXi
           xorg.libXtst
+          xorg.libXcursor
         ];
         LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";
 
