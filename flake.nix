@@ -95,6 +95,9 @@
             postBuild = ''
               wrapProgram $out/bin/killa --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath buildInputs} --set PATH $out/bin
             '';
+            meta = {
+              mainProgram = "killa";
+            };
           };
 
         mkScript = name: text: (pkgs.writeShellScriptBin name text);
@@ -190,7 +193,6 @@
             cargoNextestPartitionsExtraArgs = "--no-tests=pass";
           });
         };
-
       }
     );
 }
