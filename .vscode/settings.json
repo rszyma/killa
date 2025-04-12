@@ -1,16 +1,16 @@
 {
-    "files.watcherExclude": {
-        "crates/bottom/": false // doesn't matter
-    },
-    "files.exclude": {
-        "crates/bottom/": false // doesn't matter too
-    },
+    // "files.watcherExclude": {
+    //     "crates/bottom/": false // doesn't matter
+    // },
+    // "files.exclude": {
+    //     "crates/bottom/": false // doesn't matter too
+    // },
     // previously named "rust-analyzer.excludeGlobs"
     // it seems like it doesn't work - issue:
     //  https://github.com/rust-lang/rust-analyzer/issues/14734
     // `cargo clean` doesn't help.
-    "rust-analyzer.files.excludeDirs": [
-        "crates/bottom/"
-    ],
+    // "rust-analyzer.files.excludeDirs": [
+    //     "crates/bottom/"
+    // ],
     // "rust-analyzer.cargo.features": []
 }

@@ -16,12 +16,14 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
             .iter()
             .map(|ps| crate::Row {
                 program_name: ps.name.clone(),
+                program_name_lowercase: ps.name.to_lowercase(),
                 mem: ps.mem_usage_bytes / 1_000_000,
                 cpu_perc: (((ps.cpu_usage_percent) / (num_cpus::get() as f32) * 10.0) as i32)
                     as f32
                     / 10.0,
                 pid: ps.pid,
                 command: ps.command.clone(),
+                command_lowercase: ps.command.to_lowercase(),
                 cpu_time: ps.time,
             })
             .collect();
@@ -34,12 +36,19 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
 
 impl KillaData {
     pub fn search(mut self, search_phrase: &str) -> Self {
+        // FUTUREWORK: results ranking
+        let case_insensitive: bool = true;
+        let s = &search_phrase.to_lowercase();
         self.rows.retain(|x| {
-            // NOTE: for now this is basic filter, without results ranking.
-            // We might want to implement something better in the future.
-            x.program_name.contains(search_phrase)
-                || x.command.contains(search_phrase)
-                || format!("{}", x.pid).contains(search_phrase)
+            if case_insensitive {
+                x.program_name_lowercase.contains(s)
+                    || x.command_lowercase.contains(s)
+                    || format!("{}", x.pid).contains(s)
+            } else {
+                x.program_name.contains(search_phrase)
+                    || x.command.contains(search_phrase)
+                    || format!("{}", x.pid).contains(search_phrase)
+            }
         });
         self
     }

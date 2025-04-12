@@ -385,10 +385,12 @@ pub enum ColumnKind {
 #[derive(Clone)]
 struct Row {
     program_name: String,
+    program_name_lowercase: String, // index for search
     mem: u64,
     cpu_perc: f32,
     pid: i32,
     command: String,
+    command_lowercase: String, // index for search
     cpu_time: Duration,
     // start_time: Option<chrono::DateTime<chrono::Local>>,
 }
