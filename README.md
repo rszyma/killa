@@ -1,19 +1,29 @@
 # killa 🔪
 
-Killa is a simple GUI process monitor written in Rust, targeted for Linux desktops.
+Killa is an opinionated GUI process monitor written in Rust, targeted for Linux desktops.
 Works on Wayland and X.
 
-It's inspired by gnome-system-monitor looks. But unlike gnome-system-monitor,
-it's aiming to have instant startup times, and high ergonomics with just keyboard.
+tech: [Iced][iced] (frontend) + [Bottom][bottom] (backend)
 
-tech: Iced (frontend) + Bottom (backend)
+# Why another system monitor?
+
+I wanted a desktop system monitor with looks and UX of [gnome-system-monitor][gsm], but with faster statup times. I couldn't find any other UI system monitor that I like (including many terminal ones like atop, btop, htop, glances, etc.). So I've wrote my own.
+
+Gnome System Monitor startup times are around ~3-5s for me on NixOS, while killa is ~500ms.
+
+# Status
+
+Very barebones for now, but usable (I main it).
+Many features are still missing, especially killing processes.
+But most of the ones I need are already implemented.
 
 # Features
 
-- show list of processes, sorted by CPU usage, refreshed every 1s
-- show total memory usage %
-- instant startup time (~500ms on my system)
-- ctrl+f to search and filter processes
+- Instant startup time (~500ms on my system)
+- Shows a list of processes, sorted by CPU usage, refreshed every 1s
+- Ctrl+F to search and filter processes
+  - search is case-insensitive, terms split by spaces, exlude a term with `-` prefix
+- Shows total memory usage %
 
 # Installation
 
@@ -54,3 +64,6 @@ Then, add the package:
   ];
 }
 ```
+[iced]: https://github.com/iced-rs/iced
+[bottom]: https://github.com/ClementTsang/bottom
+[gsm]: https://apps.gnome.org/SystemMonitor/
