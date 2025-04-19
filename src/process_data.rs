@@ -34,22 +34,57 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
     }
 }
 
+#[derive(Debug)]
+enum SearchFilter {
+    Include(String),
+    Exclude(String),
+}
+
+#[derive(Debug)]
+struct SearchFilters(Vec<SearchFilter>);
+
+impl SearchFilters {
+    fn parse_from_string(search_phrase: &str) -> Self {
+        let xs: Vec<_> = search_phrase
+            .split_ascii_whitespace()
+            .filter_map(|t| {
+                if let Some(exclude) = t.strip_prefix("-") {
+                    if !exclude.is_empty() {
+                        Some(SearchFilter::Exclude(exclude.to_string()))
+                    } else {
+                        None
+                    }
+                } else if !t.is_empty() {
+                    Some(SearchFilter::Include(t.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        SearchFilters(xs)
+    }
+}
+
 impl KillaData {
     pub fn search(mut self, search_phrase: &str) -> Self {
-        // FUTUREWORK: results ranking
-        let case_insensitive: bool = true;
-        let s = &search_phrase.to_lowercase();
-        self.rows.retain(|x| {
-            if case_insensitive {
-                x.program_name_lowercase.contains(s)
-                    || x.command_lowercase.contains(s)
-                    || format!("{}", x.pid).contains(s)
-            } else {
-                x.program_name.contains(search_phrase)
-                    || x.command.contains(search_phrase)
-                    || format!("{}", x.pid).contains(search_phrase)
-            }
+        let filters = SearchFilters::parse_from_string(&search_phrase.to_lowercase());
+        dbg!(&filters);
+
+        self.rows.retain(|row| {
+            filters.0.iter().all(|filter| match filter {
+                SearchFilter::Include(s) => {
+                    row.program_name_lowercase.contains(s)
+                        || row.command_lowercase.contains(s)
+                        || format!("{}", row.pid).contains(s)
+                }
+                SearchFilter::Exclude(s) => {
+                    !(row.program_name_lowercase.contains(s)
+                        || row.command_lowercase.contains(s)
+                        || format!("{}", row.pid).contains(s))
+                }
+            })
         });
+
         self
     }
 
