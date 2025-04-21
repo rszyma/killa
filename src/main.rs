@@ -161,9 +161,7 @@ impl App {
                 (NO_MODS, T::Named(K::Backspace), _) => {
                     Some(Message::Search(TextInputAction::Backspace))
                 }
-                (NO_MODS, T::Named(K::Escape), true) => {
-                    Some(Message::Search(TextInputAction::Hide))
-                }
+                (NO_MODS, T::Named(K::Escape), _) => Some(Message::Search(TextInputAction::Hide)),
 
                 ////////////////////////
                 // CTRL modifier
