@@ -219,7 +219,15 @@ impl App {
                     }
                 };
                 self.filter_rows();
-                return text_input::focus(SEARCH_INPUT_ID);
+
+                let tasks: Vec<Task<Message>> = vec![
+                    scrollable::scroll_to(
+                        self.body.clone(),
+                        scrollable::AbsoluteOffset { x: 0., y: 0. },
+                    ),
+                    text_input::focus(SEARCH_INPUT_ID),
+                ];
+                return Task::batch(tasks);
             }
             Message::CollectedData(data) => {
                 if self.freeze {
