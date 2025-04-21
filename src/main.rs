@@ -171,7 +171,7 @@ impl App {
                 (M::CTRL, T::Character("f"), false) => {
                     Some(Message::Search(TextInputAction::Toggle))
                 }
-                (M::CTRL, T::Character("t"), _) => Some(Message::ToggleFreeze),
+                (M::CTRL, T::Character("d"), _) => Some(Message::ToggleFreeze),
                 (M::CTRL, T::Character("1"), _) => Some(Message::SetSortField(ColumnKind::CPU)),
                 (M::CTRL, T::Character("2"), _) => Some(Message::SetSortField(ColumnKind::Memory)),
                 (M::CTRL, T::Character("3"), _) => Some(Message::SetSortField(ColumnKind::PID)),
