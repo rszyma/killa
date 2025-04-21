@@ -70,8 +70,8 @@ enum Message {
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
     Resized,
-    ResizeColumnsEnabled(bool),
-    WireframeToggled(bool),
+    ToggleFreeze(bool),
+    ToggleWireframe(bool),
     DeleteRow(usize),
     Search(TextInputAction),
 }
@@ -81,7 +81,7 @@ struct App {
     rows: Vec<Row>,
     header: scrollable::Id,
     body: scrollable::Id,
-    resize_columns_enabled: bool,
+    freeze: bool,
     theme: Theme,
     search: Option<String>,
     sort: ProcessListSort,
@@ -104,7 +104,7 @@ impl Default for App {
             rows: vec![],
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
-            resize_columns_enabled: true,
+            freeze: false,
             theme: Theme::Dark,
             search: None,
             sort: ProcessListSort {
@@ -211,6 +211,9 @@ impl App {
                 return text_input::focus(SEARCH_INPUT_ID);
             }
             Message::CollectedData(data) => {
+                if self.freeze {
+                    return Task::none();
+                }
                 let kd = KillaData::from(data);
                 self.last_data = kd;
                 self.sort_rows();
@@ -232,8 +235,8 @@ impl App {
                     column.width += offset;
                 }
             }),
-            Message::ResizeColumnsEnabled(enabled) => self.resize_columns_enabled = enabled,
-            Message::WireframeToggled(enabled) => self.enable_wireframe = enabled,
+            Message::ToggleFreeze(enabled) => self.freeze = enabled,
+            Message::ToggleWireframe(enabled) => self.enable_wireframe = enabled,
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
@@ -254,18 +257,16 @@ impl App {
                 Message::SyncHeader,
             );
 
-            if self.resize_columns_enabled {
-                table = table.on_column_resize(Message::Resizing, Message::Resized);
-            }
+            // Make columns resizable.
+            table = table.on_column_resize(Message::Resizing, Message::Resized);
+
             table = table.min_width(size.width); // this autoresizes table width to window
             table.into()
         });
 
         let topbar_left = column![
-            checkbox("Resize Columns", self.resize_columns_enabled)
-                .on_toggle(Message::ResizeColumnsEnabled),
-            checkbox("Enable Wireframe", self.enable_wireframe)
-                .on_toggle(Message::WireframeToggled),
+            checkbox("Freeze ️❄️", self.freeze).on_toggle(Message::ToggleFreeze),
+            checkbox("Wireframe", self.enable_wireframe).on_toggle(Message::ToggleWireframe),
         ]
         .spacing(6);
 
