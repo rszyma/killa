@@ -68,7 +68,6 @@ impl SearchFilters {
 impl KillaData {
     pub fn search(mut self, search_phrase: &str) -> Self {
         let filters = SearchFilters::parse_from_string(&search_phrase.to_lowercase());
-        dbg!(&filters);
 
         self.rows.retain(|row| {
             filters.0.iter().all(|filter| match filter {
@@ -91,8 +90,11 @@ impl KillaData {
     pub fn sort_by_column(&mut self, col: crate::ColumnKind, order: SortOrder) -> &mut Self {
         match col {
             crate::ColumnKind::Name => {}
-            crate::ColumnKind::Memory => {}
-            crate::ColumnKind::Cpu => match order {
+            crate::ColumnKind::Memory => match order {
+                SortOrder::Ascending => self.rows.sort_by_key(|row| row.mem),
+                SortOrder::Descending => self.rows.sort_by_key(|row| u64::MAX - row.mem),
+            },
+            crate::ColumnKind::CPU => match order {
                 SortOrder::Ascending => self
                     .rows
                     .sort_by_key(|row| (row.cpu_perc * 10000.0f32) as u32 - (100 * 10000)),
@@ -100,7 +102,7 @@ impl KillaData {
                     .rows
                     .sort_by_key(|row| (100 * 10000) - (row.cpu_perc * 10000.0f32) as u32),
             },
-            crate::ColumnKind::Pid => {}
+            crate::ColumnKind::PID => {}
             crate::ColumnKind::Command => {}
             crate::ColumnKind::CpuTime => {}
             crate::ColumnKind::Started => {}

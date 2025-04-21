@@ -72,6 +72,7 @@ enum Message {
     Resized,
     ToggleFreeze(bool),
     ToggleWireframe(bool),
+    ToggleSortField(bool),
     DeleteRow(usize),
     Search(TextInputAction),
 }
@@ -81,11 +82,11 @@ struct App {
     rows: Vec<Row>,
     header: scrollable::Id,
     body: scrollable::Id,
-    freeze: bool,
     theme: Theme,
     search: Option<String>,
     sort: ProcessListSort,
     last_data: KillaData,
+    freeze: bool,
     enable_wireframe: bool,
 }
 
@@ -95,8 +96,8 @@ impl Default for App {
             columns: vec![
                 Column::new(ColumnKind::Name),
                 Column::new(ColumnKind::Memory),
-                Column::new(ColumnKind::Cpu),
-                Column::new(ColumnKind::Pid),
+                Column::new(ColumnKind::CPU),
+                Column::new(ColumnKind::PID),
                 // Column::new(ColumnKind::CpuTime),
                 // Column::new(ColumnKind::Started), // todo
                 Column::new(ColumnKind::Command),
@@ -104,14 +105,14 @@ impl Default for App {
             rows: vec![],
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
-            freeze: false,
             theme: Theme::Dark,
             search: None,
             sort: ProcessListSort {
-                column: ColumnKind::Cpu,
+                column: ColumnKind::CPU,
                 order: SortOrder::default(),
             },
             last_data: KillaData::default(),
+            freeze: false,
             enable_wireframe: false,
         }
     }
@@ -237,6 +238,15 @@ impl App {
             }),
             Message::ToggleFreeze(enabled) => self.freeze = enabled,
             Message::ToggleWireframe(enabled) => self.enable_wireframe = enabled,
+            Message::ToggleSortField(enabled) => {
+                self.sort.column = if enabled {
+                    ColumnKind::Memory
+                } else {
+                    ColumnKind::CPU
+                };
+                self.sort_rows();
+                self.filter_rows(); // need to filter, because filter also resets.
+            }
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
@@ -267,6 +277,11 @@ impl App {
         let topbar_left = column![
             checkbox("Freeze ️❄️", self.freeze).on_toggle(Message::ToggleFreeze),
             checkbox("Wireframe", self.enable_wireframe).on_toggle(Message::ToggleWireframe),
+            checkbox(
+                format!("Sort By [{:?}]", self.sort.column),
+                !matches!(self.sort.column, ColumnKind::CPU)
+            )
+            .on_toggle(Message::ToggleSortField),
         ]
         .spacing(6);
 
@@ -307,6 +322,16 @@ impl App {
         );
 
         let content = column![topbar, table].spacing(6);
+
+        let content: Element<_> = container(
+            content,
+            // .align_x(Horizontal::Center)
+            // .width(Length::Shrink)
+            // .height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .padding(5)
+        .into();
 
         let all: Element<_> =
             container(container(content).width(Length::Fill).height(Length::Fill))
@@ -350,8 +375,8 @@ impl Column {
         let width = match kind {
             ColumnKind::Name => 350.0,
             ColumnKind::Memory => 100.0,
-            ColumnKind::Cpu => 60.0,
-            ColumnKind::Pid => 80.0,
+            ColumnKind::CPU => 60.0,
+            ColumnKind::PID => 80.0,
             ColumnKind::Command => 400.0,
             ColumnKind::CpuTime => 100.0,
             ColumnKind::Started => 100.0,
@@ -368,12 +393,12 @@ impl Column {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ColumnKind {
     Name,
     Memory,
-    Cpu,
-    Pid,
+    CPU,
+    PID,
     Command,
     Started,
     CpuTime,
@@ -403,8 +428,8 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
         let content = match self.kind {
             ColumnKind::Name => "Name",
             ColumnKind::Memory => "Memory",
-            ColumnKind::Cpu => "CPU",
-            ColumnKind::Pid => "ID",
+            ColumnKind::CPU => "CPU",
+            ColumnKind::PID => "ID",
             ColumnKind::CpuTime => "Time",
 
             ColumnKind::Started => "Started",
@@ -426,8 +451,8 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
         let content: Element<_> = match self.kind {
             ColumnKind::Name => text!("{}", row.program_name).size(font_size).into(),
             ColumnKind::Memory => text!("{} MB", row.mem).size(font_size).into(),
-            ColumnKind::Cpu => text!("{:.1} %", row.cpu_perc).size(font_size).into(),
-            ColumnKind::Pid => text!("{}", row.pid).size(font_size).into(),
+            ColumnKind::CPU => text!("{:.1} %", row.cpu_perc).size(font_size).into(),
+            ColumnKind::PID => text!("{}", row.pid).size(font_size).into(),
             ColumnKind::Command => tooltip(
                 text!("{}", row.command).size(font_size),
                 container(text!("{}", row.command).size(tooltip_font_size))
