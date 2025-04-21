@@ -102,7 +102,7 @@ impl KillaData {
                     .rows
                     .sort_by_key(|row| (100 * 10000) - (row.cpu_perc * 10000.0f32) as u32),
             },
-            crate::ColumnKind::PID => {}
+            crate::ColumnKind::PID => self.rows.sort_by_key(|row| i32::MAX - row.pid),
             crate::ColumnKind::Command => {}
             crate::ColumnKind::CpuTime => {}
             crate::ColumnKind::Started => {}

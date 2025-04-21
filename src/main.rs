@@ -70,9 +70,9 @@ enum Message {
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
     Resized,
-    ToggleFreeze(bool),
+    ToggleFreeze,
     ToggleWireframe(bool),
-    ToggleSortField(bool),
+    SetSortField(ColumnKind),
     DeleteRow(usize),
     Search(TextInputAction),
 }
@@ -131,45 +131,55 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         event::listen_with(|event, status, _window| -> Option<Message> {
+            use iced::keyboard::Modifiers as M;
             use keyboard::key::Named as K;
             use keyboard::Key as T;
 
-            if let event::Status::Captured = status {
-                // Shortcuts in search box active
-                if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
-                    match key {
-                        T::Character(c) => {
-                            if modifiers.control() && (c == "f") {
-                                return Some(Message::Search(TextInputAction::Hide));
-                            }
-                        }
-                        T::Named(K::Escape) => {
-                            return Some(Message::Search(TextInputAction::Hide));
-                        }
-                        _ => {}
-                    }
-                };
+            // Right now, there's only one widget that can capture input - seach box.
+            let is_search_box_active = matches!(status, event::Status::Captured);
+
+            let (key, modifiers) = if let Event::Keyboard(keyboard::Event::KeyPressed {
+                key,
+                modifiers,
+                ..
+            }) = event
+            {
+                (key, modifiers)
+            } else {
                 return None;
             };
 
-            // Out-of-search-box keyboard shortcuts.
-            if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
-                match key {
-                    T::Named(K::Backspace) => {
-                        return Some(Message::Search(TextInputAction::Backspace))
-                    }
-                    T::Character(c) => {
-                        if modifiers.control() && (c == "f") {
-                            return Some(Message::Search(TextInputAction::Toggle));
-                        } else {
-                            return Some(Message::Search(TextInputAction::Append(c.to_string())));
-                        };
-                    }
-                    _ => {}
+            const NO_MODS: M = M::empty();
+
+            // keybinds
+            let res: Option<_> = match (modifiers, key.as_ref(), is_search_box_active) {
+                ////////////////////////
+                // No modifiers
+                (NO_MODS, T::Character(c), false) => {
+                    Some(Message::Search(TextInputAction::Append(c.to_string())))
                 }
+                (NO_MODS, T::Named(K::Backspace), _) => {
+                    Some(Message::Search(TextInputAction::Backspace))
+                }
+                (NO_MODS, T::Named(K::Escape), true) => {
+                    Some(Message::Search(TextInputAction::Hide))
+                }
+
+                ////////////////////////
+                // CTRL modifier
+                (M::CTRL, T::Character("f"), true) => Some(Message::Search(TextInputAction::Hide)),
+                (M::CTRL, T::Character("f"), false) => {
+                    Some(Message::Search(TextInputAction::Toggle))
+                }
+                (M::CTRL, T::Character("t"), _) => Some(Message::ToggleFreeze),
+                (M::CTRL, T::Character("1"), _) => Some(Message::SetSortField(ColumnKind::CPU)),
+                (M::CTRL, T::Character("2"), _) => Some(Message::SetSortField(ColumnKind::Memory)),
+                (M::CTRL, T::Character("3"), _) => Some(Message::SetSortField(ColumnKind::PID)),
+
+                _ => None,
             };
 
-            None
+            res
         })
     }
 
@@ -236,16 +246,12 @@ impl App {
                     column.width += offset;
                 }
             }),
-            Message::ToggleFreeze(enabled) => self.freeze = enabled,
+            Message::ToggleFreeze => self.freeze = !self.freeze,
             Message::ToggleWireframe(enabled) => self.enable_wireframe = enabled,
-            Message::ToggleSortField(enabled) => {
-                self.sort.column = if enabled {
-                    ColumnKind::Memory
-                } else {
-                    ColumnKind::CPU
-                };
+            Message::SetSortField(sort_field) => {
+                self.sort.column = sort_field;
                 self.sort_rows();
-                self.filter_rows(); // need to filter, because filter also resets.
+                self.filter_rows();
             }
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
@@ -275,13 +281,9 @@ impl App {
         });
 
         let topbar_left = column![
-            checkbox("Freeze ️❄️", self.freeze).on_toggle(Message::ToggleFreeze),
+            checkbox("Freeze ️❄️", self.freeze).on_toggle(|_| Message::ToggleFreeze),
             checkbox("Wireframe", self.enable_wireframe).on_toggle(Message::ToggleWireframe),
-            checkbox(
-                format!("Sort By [{:?}]", self.sort.column),
-                !matches!(self.sort.column, ColumnKind::CPU)
-            )
-            .on_toggle(Message::ToggleSortField),
+            text(format!("Sorting By {:?}", self.sort.column))
         ]
         .spacing(6);
 
