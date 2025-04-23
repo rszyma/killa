@@ -2,14 +2,15 @@ use crate::collector::colv2::run_collector_worker;
 use bottom::event::BottomEvent;
 use collector::init::init_collector;
 use iced::alignment::{Horizontal, Vertical};
+use iced::widget::container::background;
 use iced::widget::tooltip::Position;
 use iced::widget::{
     button, checkbox, column, container, responsive, row, scrollable, text, text_input, tooltip,
 };
 use iced::window::{self};
 use iced::{
-    event, keyboard, Color, Element, Event, Font, Length, Pixels, Renderer, Size, Subscription,
-    Task, Theme,
+    border, color, event, keyboard, Color, Element, Event, Font, Length, Pixels, Renderer, Size,
+    Subscription, Task, Theme,
 };
 use iced_table::table::{self};
 use process_data::{KillaData, ProcessListSort, SortOrder};
@@ -357,7 +358,7 @@ impl App {
         });
 
         let topbar_left = column![
-            checkbox("Freeze ️❄️", matches!(self.freeze, Freeze::Enabled(_)))
+            checkbox("Freeze", matches!(self.freeze, Freeze::Enabled(_)))
                 .on_toggle(|_| Message::ToggleFreeze),
             checkbox("Wireframe", self.enable_wireframe).on_toggle(Message::ToggleWireframe),
             text(format!("Sorting By {:?}", self.sort.column))
@@ -400,17 +401,21 @@ impl App {
             .padding(10),
         );
 
-        let content = column![topbar, table].spacing(6);
+        // fix transparency issues with table.
+        let table = container(table).style(|theme| background(theme.palette().background));
 
-        let content: Element<_> = container(
-            content,
-            // .align_x(Horizontal::Center)
-            // .width(Length::Shrink)
-            // .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .padding(5)
-        .into();
+        // cool blue border on freeze
+        let table = if matches!(self.freeze, Freeze::Enabled(_)) {
+            container(table).style(|_theme| {
+                container::bordered_box(&self.theme)
+                    .border(border::width(10).color(color!(0x6495ED)))
+            })
+        } else {
+            container(table)
+        }
+        .padding(2);
+
+        let content = column![topbar, table,].spacing(6);
 
         let all: Element<_> =
             container(container(content).width(Length::Fill).height(Length::Fill))
