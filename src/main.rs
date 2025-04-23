@@ -63,18 +63,34 @@ enum TextInputAction {
     Hide,
 }
 
+struct Search {
+    is_hidden: bool,
+    text: String,
+}
+
 /// Messages that update UI.
 #[derive(Debug, Clone)]
 enum Message {
+    #[allow(dead_code)] // this is really cool I wanna keep it even if it's not used.
+    Chain(Vec<Message>),
+
     CollectedData(Box<bottom::data_collection::Data>),
     SyncHeader(scrollable::AbsoluteOffset),
     Resizing(usize, f32),
     Resized,
     ToggleFreeze,
+    SwitchFreeze(bool),
+    Refreeze, // If already freezed refresh data then freeze again, otherwise freeze.
     ToggleWireframe(bool),
     SetSortField(ColumnKind),
     DeleteRow(usize),
     Search(TextInputAction),
+}
+
+#[derive(Clone)]
+enum Freeze {
+    Disabled,
+    Enabled(Option<KillaData>), // holds latest collected data
 }
 
 struct App {
@@ -83,10 +99,10 @@ struct App {
     header: scrollable::Id,
     body: scrollable::Id,
     theme: Theme,
-    search: Option<String>,
+    search: Search,
     sort: ProcessListSort,
     last_data: KillaData,
-    freeze: bool,
+    freeze: Freeze,
     enable_wireframe: bool,
 }
 
@@ -106,13 +122,16 @@ impl Default for App {
             header: scrollable::Id::unique(),
             body: scrollable::Id::unique(),
             theme: Theme::Dark,
-            search: None,
+            search: Search {
+                is_hidden: false,
+                text: String::new(),
+            },
             sort: ProcessListSort {
                 column: ColumnKind::CPU,
                 order: SortOrder::default(),
             },
             last_data: KillaData::default(),
-            freeze: false,
+            freeze: Freeze::Disabled,
             enable_wireframe: false,
         }
     }
@@ -154,7 +173,7 @@ impl App {
             // keybinds
             let res: Option<_> = match (modifiers, key.as_ref(), is_search_box_active) {
                 ////////////////////////
-                // No modifiers
+                // search
                 (NO_MODS, T::Character(c), false) => {
                     Some(Message::Search(TextInputAction::Append(c.to_string())))
                 }
@@ -162,17 +181,21 @@ impl App {
                     Some(Message::Search(TextInputAction::Backspace))
                 }
                 (NO_MODS, T::Named(K::Escape), _) => Some(Message::Search(TextInputAction::Hide)),
-
-                ////////////////////////
-                // CTRL modifier
                 (M::CTRL, T::Character("f"), true) => Some(Message::Search(TextInputAction::Hide)),
                 (M::CTRL, T::Character("f"), false) => {
                     Some(Message::Search(TextInputAction::Toggle))
                 }
-                (M::CTRL, T::Character("d"), _) => Some(Message::ToggleFreeze),
+
+                ////////////////////////
+                // select sort field
                 (M::CTRL, T::Character("1"), _) => Some(Message::SetSortField(ColumnKind::CPU)),
                 (M::CTRL, T::Character("2"), _) => Some(Message::SetSortField(ColumnKind::Memory)),
                 (M::CTRL, T::Character("3"), _) => Some(Message::SetSortField(ColumnKind::PID)),
+
+                ////////////////////////
+                // freeze
+                (NO_MODS, T::Named(K::Enter), true) => Some(Message::Refreeze),
+                (M::SHIFT, T::Named(K::Enter), _) => Some(Message::SwitchFreeze(false)),
 
                 _ => None,
             };
@@ -183,55 +206,85 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::Chain(msgs) => {
+                let tasks = msgs.into_iter().map(|msg| self.update(msg));
+                let mut task_chain = Task::none();
+                for task in tasks {
+                    task_chain = task_chain.chain(task);
+                }
+                return task_chain;
+            }
             Message::Search(ev) => {
-                match ev {
-                    TextInputAction::Append(s) => match &mut self.search {
-                        Some(text) => text.push_str(&s),
-                        None => {
-                            self.search.replace(s);
-                        }
-                    },
-                    TextInputAction::Replace(s) => {
-                        let _ = self.search.insert(s);
-                    }
-                    TextInputAction::Backspace => {
-                        if let Some(x) = &mut self.search {
-                            x.pop();
-                        }
-                    }
-                    TextInputAction::Toggle => match &self.search {
-                        Some(_) => {
-                            self.filter_rows();
-                            self.search.take();
-                        }
-                        None => {
-                            let _ = self.search.insert("".into());
-                            return text_input::focus(SEARCH_INPUT_ID)
-                                .chain(text_input::select_all(SEARCH_INPUT_ID));
-                        }
-                    },
-                    TextInputAction::Hide => {
-                        self.search.take();
-                        self.filter_rows();
-                        return Task::none();
-                    }
-                };
-                self.filter_rows();
-
-                let tasks: Vec<Task<Message>> = vec![
+                let scroll_to_top = scrollable::scroll_to(
+                    self.body.clone(),
+                    scrollable::AbsoluteOffset { x: 0., y: 0. },
+                );
+                let scroll_to_top_and_focus = Task::batch(vec![
                     scrollable::scroll_to(
                         self.body.clone(),
                         scrollable::AbsoluteOffset { x: 0., y: 0. },
                     ),
                     text_input::focus(SEARCH_INPUT_ID),
-                ];
-                return Task::batch(tasks);
+                ]);
+
+                // let _: ! =
+                match ev {
+                    TextInputAction::Append(s) => {
+                        if self.search.is_hidden {
+                            self.search.text.push_str(&s);
+                            self.set_freeze(false);
+                        } else {
+                            self.search.is_hidden = true;
+                            self.search.text = s;
+                            self.set_freeze(false);
+                        }
+                        self.filter_rows();
+                        return scroll_to_top_and_focus;
+                    }
+                    TextInputAction::Replace(s) => {
+                        self.search.is_hidden = true;
+                        self.search.text = s;
+                        self.set_freeze(false);
+                        self.filter_rows();
+                        return scroll_to_top_and_focus;
+                    }
+                    TextInputAction::Backspace => {
+                        if self.search.is_hidden {
+                            self.search.text.pop();
+                            self.set_freeze(false);
+                            self.filter_rows();
+                            return scroll_to_top_and_focus;
+                        } else {
+                            return Task::none();
+                        }
+                    }
+                    TextInputAction::Toggle => {
+                        self.set_freeze(false);
+                        if self.search.is_hidden {
+                            self.search.is_hidden = false;
+                            self.filter_rows();
+                            return scroll_to_top_and_focus;
+                        } else {
+                            self.search.is_hidden = true;
+                            self.filter_rows();
+                            return scroll_to_top_and_focus
+                                .chain(text_input::select_all(SEARCH_INPUT_ID));
+                        }
+                    }
+                    TextInputAction::Hide => {
+                        self.search.is_hidden = false;
+                        self.set_freeze(false);
+                        self.filter_rows();
+                        return scroll_to_top;
+                    }
+                };
             }
             Message::CollectedData(data) => {
-                if self.freeze {
+                let kd = KillaData::from(data);
+                if let Freeze::Enabled(d) = &mut self.freeze {
+                    d.replace(kd);
                     return Task::none();
                 }
-                let kd = KillaData::from(data);
                 self.last_data = kd;
                 self.sort_rows();
                 self.filter_rows();
@@ -252,7 +305,24 @@ impl App {
                     column.width += offset;
                 }
             }),
-            Message::ToggleFreeze => self.freeze = !self.freeze,
+            Message::ToggleFreeze => {
+                if matches!(self.freeze, Freeze::Enabled(_)) {
+                    self.set_freeze(false)
+                } else {
+                    self.set_freeze(true)
+                }
+            }
+            Message::SwitchFreeze(enable) => self.set_freeze(enable),
+            Message::Refreeze => {
+                if matches!(self.freeze, Freeze::Disabled) {
+                    self.set_freeze(true);
+                } else {
+                    self.set_freeze(false);
+                    self.sort_rows();
+                    self.filter_rows();
+                    self.set_freeze(true);
+                }
+            }
             Message::ToggleWireframe(enabled) => self.enable_wireframe = enabled,
             Message::SetSortField(sort_field) => {
                 self.sort.column = sort_field;
@@ -287,7 +357,8 @@ impl App {
         });
 
         let topbar_left = column![
-            checkbox("Freeze ️❄️", self.freeze).on_toggle(|_| Message::ToggleFreeze),
+            checkbox("Freeze ️❄️", matches!(self.freeze, Freeze::Enabled(_)))
+                .on_toggle(|_| Message::ToggleFreeze),
             checkbox("Wireframe", self.enable_wireframe).on_toggle(Message::ToggleWireframe),
             text(format!("Sorting By {:?}", self.sort.column))
         ]
@@ -305,8 +376,8 @@ impl App {
 
         let mut topbar = row![topbar_left].spacing(6);
 
-        if let Some(search_text) = &self.search {
-            let search_box = text_input("Search processes", search_text)
+        if self.search.is_hidden {
+            let search_box = text_input("Search processes", &self.search.text)
                 .on_input(|text| Message::Search(TextInputAction::Replace(text)))
                 .id(text_input::Id::new(SEARCH_INPUT_ID));
             topbar = topbar.push(container(search_box).padding(10).align_y(Vertical::Center));
@@ -358,9 +429,9 @@ impl App {
     fn filter_rows(&mut self) {
         self.rows.clear();
         let a = self.last_data.clone();
-        let a = match &self.search {
-            Some(phrase) => a.search(phrase),
-            None => a,
+        let a = match &self.search.is_hidden {
+            true => a.search(&self.search.text),
+            false => a,
         };
         let a: Vec<Row> = a.into();
         self.rows.extend(a);
@@ -369,6 +440,22 @@ impl App {
     fn sort_rows(&mut self) {
         let ProcessListSort { column, order } = self.sort;
         self.last_data.sort_by_column(column, order);
+    }
+
+    fn set_freeze(&mut self, enable: bool) {
+        match (self.freeze.clone(), enable) {
+            (Freeze::Disabled, true) => {
+                self.freeze = Freeze::Enabled(None);
+            }
+            (Freeze::Disabled, false) => {}  // already disabled
+            (Freeze::Enabled(_), true) => {} // already enabled
+            (Freeze::Enabled(latest_collected_data), false) => {
+                if let Some(data) = latest_collected_data {
+                    self.last_data = data;
+                };
+                self.freeze = Freeze::Disabled;
+            }
+        }
     }
 }
 
