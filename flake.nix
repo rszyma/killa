@@ -1,6 +1,11 @@
 {
   # testing flake: nix develop --unset PATH
 
+  nixConfig = {
+    extra-substituters = [ "https://rszyma.cachix.org" ];
+    extra-trusted-public-keys = [ "rszyma.cachix.org-1:L3LKXbrUk+OfUBXj2JjxNrq23Z2BccrgDm/S2r012tg=" ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
@@ -22,8 +27,18 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, crane, fenix, advisory-db }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+      crane,
+      fenix,
+      advisory-db,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -70,12 +85,13 @@
         # toolchain = fenixPkgs.stable;
         # combinedToolchain = toolchain.completeToolchain;
 
-        craneLibLLvmTools = craneLib.overrideToolchain
-          (fenix.packages.${system}.complete.withComponents [
+        craneLibLLvmTools = craneLib.overrideToolchain (
+          fenix.packages.${system}.complete.withComponents [
             "cargo"
             "llvm-tools"
             "rustc"
-          ]);
+          ]
+        );
 
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
@@ -83,22 +99,24 @@
 
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
-        killaCrate = craneLib.buildPackage (commonArgs // {
-          inherit cargoArtifacts;
-        });
+        killaCrate = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+          }
+        );
 
-        wrappedKillaCrate = pkgs.symlinkJoin
-          {
-            name = "killa";
-            paths = [ killaCrate ];
-            buildInputs = [ pkgs.makeWrapper ];
-            postBuild = ''
-              wrapProgram $out/bin/killa --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath buildInputs} --set PATH $out/bin
-            '';
-            meta = {
-              mainProgram = "killa";
-            };
+        wrappedKillaCrate = pkgs.symlinkJoin {
+          name = "killa";
+          paths = [ killaCrate ];
+          buildInputs = [ pkgs.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/killa --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath buildInputs} --set PATH $out/bin
+          '';
+          meta = {
+            mainProgram = "killa";
           };
+        };
 
         mkScript = name: text: (pkgs.writeShellScriptBin name text);
         devshellScripts = [
@@ -107,13 +125,18 @@
         ];
       in
       {
-        packages = {
-          default = wrappedKillaCrate;
-        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs // {
-            inherit cargoArtifacts;
-          });
-        };
+        packages =
+          {
+            default = wrappedKillaCrate;
+          }
+          // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+            my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (
+              commonArgs
+              // {
+                inherit cargoArtifacts;
+              }
+            );
+          };
 
         apps.default = flake-utils.lib.mkApp {
           drv = wrappedKillaCrate;
@@ -121,17 +144,22 @@
 
         devShells.default = pkgs.mkShell {
           # checks = self.checks.${system};
-          nativeBuildInputs = nativeBuildInputs ++ devshellScripts ++ (
-            with pkgs;
-            let
-              toolchainOverride = { extensions = [ "rust-src" ]; };
-            in
-            [
-              # (rust-bin.stable."1.73.0".default.override toolchainOverride)
-              (rust-bin.stable.latest.default.override toolchainOverride)
-              # (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override toolchainOverride))
-            ]
-          );
+          nativeBuildInputs =
+            nativeBuildInputs
+            ++ devshellScripts
+            ++ (
+              with pkgs;
+              let
+                toolchainOverride = {
+                  extensions = [ "rust-src" ];
+                };
+              in
+              [
+                # (rust-bin.stable."1.73.0".default.override toolchainOverride)
+                (rust-bin.stable.latest.default.override toolchainOverride)
+                # (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override toolchainOverride))
+              ]
+            );
           inherit buildInputs;
           # WINIT_UNIX_BACKEND = "wayland";
           # WGPU_POWER_PREF = "low";
@@ -153,14 +181,20 @@
           # Note that this is done as a separate derivation so that
           # we can block the CI if there are issues here, but not
           # prevent downstream consumers from building our crate by itself.
-          my-crate-clippy = craneLib.cargoClippy (commonArgs // {
-            inherit cargoArtifacts;
-            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-          });
+          my-crate-clippy = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+            }
+          );
 
-          my-crate-doc = craneLib.cargoDoc (commonArgs // {
-            inherit cargoArtifacts;
-          });
+          my-crate-doc = craneLib.cargoDoc (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+            }
+          );
 
           # Check formatting
           my-crate-fmt = craneLib.cargoFmt {
@@ -186,13 +220,18 @@
           # Run tests with cargo-nextest
           # Consider setting `doCheck = false` on `my-crate` if you do not want
           # the tests to run twice
-          my-crate-nextest = craneLib.cargoNextest (commonArgs // {
-            inherit cargoArtifacts;
-            partitions = 1;
-            partitionType = "count";
-            cargoNextestPartitionsExtraArgs = "--no-tests=pass";
-          });
+          my-crate-nextest = craneLib.cargoNextest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              partitions = 1;
+              partitionType = "count";
+              cargoNextestPartitionsExtraArgs = "--no-tests=pass";
+            }
+          );
         };
+
+        formatter = pkgs.nixfmt-tree;
       }
     );
 }
