@@ -275,6 +275,7 @@ impl App {
                     TextInputAction::Hide => {
                         self.search.is_hidden = false;
                         self.set_freeze(false);
+                        self.sort_rows();
                         self.filter_rows();
                         return scroll_to_top;
                     }
@@ -308,12 +309,20 @@ impl App {
             }),
             Message::ToggleFreeze => {
                 if matches!(self.freeze, Freeze::Enabled(_)) {
-                    self.set_freeze(false)
+                    self.set_freeze(false);
+                    self.sort_rows();
+                    self.filter_rows();
                 } else {
                     self.set_freeze(true)
                 }
             }
-            Message::SwitchFreeze(enable) => self.set_freeze(enable),
+            Message::SwitchFreeze(enable) => {
+                self.set_freeze(enable);
+                if !enable {
+                    self.sort_rows();
+                    self.filter_rows();
+                }
+            }
             Message::Refreeze => {
                 if matches!(self.freeze, Freeze::Disabled) {
                     self.set_freeze(true);
