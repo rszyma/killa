@@ -58,7 +58,7 @@ fn init(collector_rx: Receiver<BottomEvent>) -> impl FnOnce() -> (App, iced::Tas
 #[derive(Debug, Clone)]
 enum TextInputAction {
     Append(String),
-    Backspace,
+    PopLastChar,
     Replace(String),
     Toggle,
     Hide,
@@ -178,8 +178,9 @@ impl App {
                 (NO_MODS, T::Character(c), false) => {
                     Some(Message::Search(TextInputAction::Append(c.to_string())))
                 }
-                (NO_MODS, T::Named(K::Backspace), _) => {
-                    Some(Message::Search(TextInputAction::Backspace))
+                // handle only if not active, otherwise we get double backspace.
+                (NO_MODS, T::Named(K::Backspace), false) => {
+                    Some(Message::Search(TextInputAction::PopLastChar))
                 }
                 (NO_MODS, T::Named(K::Escape), _) => Some(Message::Search(TextInputAction::Hide)),
                 (M::CTRL, T::Character("f"), true) => Some(Message::Search(TextInputAction::Hide)),
@@ -249,7 +250,7 @@ impl App {
                         self.filter_rows();
                         return scroll_to_top_and_focus;
                     }
-                    TextInputAction::Backspace => {
+                    TextInputAction::PopLastChar => {
                         if self.search.is_hidden {
                             self.search.text.pop();
                             self.set_freeze(false);
