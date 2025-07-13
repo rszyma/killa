@@ -7,7 +7,9 @@ tech: [Iced][iced] (frontend) + [Bottom][bottom] (backend)
 
 # Why another system monitor?
 
-I wanted a desktop system monitor with looks and UX of [gnome-system-monitor][gsm], but with faster statup times. I couldn't find any other UI system monitor that I like (including many terminal ones like atop, btop, htop, glances, etc.). So I've wrote my own.
+I wanted a desktop system monitor with looks and UX of [gnome-system-monitor][gsm], but with faster statup times.
+I couldn't find any other UI system monitor that I like (including many terminal ones like atop, btop, htop, glances, etc.).
+So I've wrote my own.
 
 Gnome System Monitor startup times are around ~3-5s for me on NixOS, while killa is ~500ms.
 
@@ -21,8 +23,17 @@ But most of the ones I need are already implemented.
 
 - Instant startup time (~500ms on my system)
 - Shows a list of processes, sorted by CPU usage, refreshed every 1s
-- Ctrl+F to search and filter processes
-  - search is case-insensitive, terms split by spaces, exlude a term with `-` prefix
+- Advanced searching:
+  - Ctrl+F to focus search field.
+  - Case-insensitive.
+  - Terms split by spaces.
+  - Prefix with `-` to revert the filter.
+  - Search in specific by column using prefixes: `name`, `pid`, `cmd`, `any` (default). Examples:
+      - `name:nix`
+      - `pid:1`
+      - `cmd:chrome`
+      - `any:test:123` (searches for literal "test:123")
+      - can be combined with `-` like this: `-pid:1`
 - Shows total memory usage %
 
 # Installation
