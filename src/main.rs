@@ -86,6 +86,7 @@ enum Message {
     SetSortField(ColumnKind),
     DeleteRow(usize),
     Search(TextInputAction),
+    Back, // Escape key or back button pressed.
 }
 
 #[derive(Clone)]
@@ -97,8 +98,8 @@ enum Freeze {
 struct App {
     columns: Vec<Column>,
     rows: Vec<Row>,
-    header: scrollable::Id,
-    body: scrollable::Id,
+    header_id: scrollable::Id,
+    body_id: scrollable::Id,
     theme: Theme,
     search: Search,
     sort: ProcessListSort,
@@ -120,8 +121,8 @@ impl Default for App {
                 Column::new(ColumnKind::Command),
             ],
             rows: vec![],
-            header: scrollable::Id::unique(),
-            body: scrollable::Id::unique(),
+            header_id: scrollable::Id::unique(),
+            body_id: scrollable::Id::unique(),
             theme: Theme::Dark,
             search: Search {
                 is_hidden: false,
@@ -169,7 +170,7 @@ impl App {
                 return None;
             };
 
-            const NO_MODS: M = M::empty();
+            const NO_MODS: iced::keyboard::Modifiers = M::empty();
 
             // keybinds
             let res: Option<_> = match (modifiers, key.as_ref(), is_search_box_active) {
@@ -182,7 +183,11 @@ impl App {
                 (NO_MODS, T::Named(K::Backspace), false) => {
                     Some(Message::Search(TextInputAction::PopLastChar))
                 }
-                (NO_MODS, T::Named(K::Escape), _) => Some(Message::Search(TextInputAction::Hide)),
+                (NO_MODS, T::Named(K::Escape), _) => {
+                    // N.B. This can't be handled here because I want diffrent action if freeze is enabled,
+                    // but can't access self.freeze in this closure.
+                    Some(Message::Back)
+                }
                 (M::CTRL, T::Character("f"), true) => Some(Message::Search(TextInputAction::Hide)),
                 (M::CTRL, T::Character("f"), false) => {
                     Some(Message::Search(TextInputAction::Toggle))
@@ -216,72 +221,7 @@ impl App {
                 }
                 return task_chain;
             }
-            Message::Search(ev) => {
-                let scroll_to_top = scrollable::scroll_to(
-                    self.body.clone(),
-                    scrollable::AbsoluteOffset { x: 0., y: 0. },
-                );
-                let scroll_to_top_and_focus = Task::batch(vec![
-                    scrollable::scroll_to(
-                        self.body.clone(),
-                        scrollable::AbsoluteOffset { x: 0., y: 0. },
-                    ),
-                    text_input::focus(SEARCH_INPUT_ID),
-                ]);
-
-                // let _: ! =
-                match ev {
-                    TextInputAction::Append(s) => {
-                        if self.search.is_hidden {
-                            self.search.text.push_str(&s);
-                            self.set_freeze(false);
-                        } else {
-                            self.search.is_hidden = true;
-                            self.search.text = s;
-                            self.set_freeze(false);
-                        }
-                        self.filter_rows();
-                        return scroll_to_top_and_focus;
-                    }
-                    TextInputAction::Replace(s) => {
-                        self.search.is_hidden = true;
-                        self.search.text = s;
-                        self.set_freeze(false);
-                        self.filter_rows();
-                        return scroll_to_top_and_focus;
-                    }
-                    TextInputAction::PopLastChar => {
-                        if self.search.is_hidden {
-                            self.search.text.pop();
-                            self.set_freeze(false);
-                            self.filter_rows();
-                            return scroll_to_top_and_focus;
-                        } else {
-                            return Task::none();
-                        }
-                    }
-                    TextInputAction::Toggle => {
-                        self.set_freeze(false);
-                        if self.search.is_hidden {
-                            self.search.is_hidden = false;
-                            self.filter_rows();
-                            return scroll_to_top_and_focus;
-                        } else {
-                            self.search.is_hidden = true;
-                            self.filter_rows();
-                            return scroll_to_top_and_focus
-                                .chain(text_input::select_all(SEARCH_INPUT_ID));
-                        }
-                    }
-                    TextInputAction::Hide => {
-                        self.search.is_hidden = false;
-                        self.set_freeze(false);
-                        self.sort_rows();
-                        self.filter_rows();
-                        return scroll_to_top;
-                    }
-                };
-            }
+            Message::Search(ev) => return self.handle_search(ev),
             Message::CollectedData(data) => {
                 let kd = KillaData::from(data);
                 if let Freeze::Enabled(d) = &mut self.freeze {
@@ -294,7 +234,7 @@ impl App {
             }
             Message::SyncHeader(offset) => {
                 return Task::batch(vec![
-                    scrollable::scroll_to(self.header.clone(), offset),
+                    scrollable::scroll_to(self.header_id.clone(), offset),
                     // scrollable::scroll_to(self.footer.clone(), offset),
                 ]);
             }
@@ -343,6 +283,16 @@ impl App {
             Message::DeleteRow(index) => {
                 self.rows.remove(index);
             }
+            Message::Back => {
+                if matches!(self.freeze, Freeze::Enabled(_)) {
+                    // Basically do what `Message::SwitchFreeze(false)` does.
+                    self.set_freeze(false);
+                    self.sort_rows();
+                    self.filter_rows();
+                } else {
+                    return self.handle_search(TextInputAction::Hide);
+                }
+            }
         }
 
         Task::none()
@@ -353,8 +303,8 @@ impl App {
         // println!("view()");
         let table = responsive(|size| {
             let mut table = iced_table::table(
-                self.header.clone(),
-                self.body.clone(),
+                self.header_id.clone(),
+                self.body_id.clone(),
                 &self.columns,
                 &self.rows,
                 Message::SyncHeader,
@@ -469,6 +419,73 @@ impl App {
                     self.last_data = data;
                 };
                 self.freeze = Freeze::Disabled;
+            }
+        }
+    }
+
+    fn handle_search(&mut self, ev: TextInputAction) -> Task<Message> {
+        let scroll_to_top = scrollable::scroll_to(
+            self.body_id.clone(),
+            scrollable::AbsoluteOffset { x: 0., y: 0. },
+        );
+
+        let scroll_to_top_and_focus = Task::batch(vec![
+            scrollable::scroll_to(
+                self.body_id.clone(),
+                scrollable::AbsoluteOffset { x: 0., y: 0. },
+            ),
+            text_input::focus(SEARCH_INPUT_ID),
+        ]);
+
+        // let _: ! =
+        match ev {
+            TextInputAction::Append(s) => {
+                if self.search.is_hidden {
+                    self.search.text.push_str(&s);
+                    self.set_freeze(false);
+                } else {
+                    self.search.is_hidden = true;
+                    self.search.text = s;
+                    self.set_freeze(false);
+                }
+                self.filter_rows();
+                scroll_to_top_and_focus
+            }
+            TextInputAction::Replace(s) => {
+                self.search.is_hidden = true;
+                self.search.text = s;
+                self.set_freeze(false);
+                self.filter_rows();
+                scroll_to_top_and_focus
+            }
+            TextInputAction::PopLastChar => {
+                if self.search.is_hidden {
+                    self.search.text.pop();
+                    self.set_freeze(false);
+                    self.filter_rows();
+                    scroll_to_top_and_focus
+                } else {
+                    Task::none()
+                }
+            }
+            TextInputAction::Toggle => {
+                self.set_freeze(false);
+                if self.search.is_hidden {
+                    self.search.is_hidden = false;
+                    self.filter_rows();
+                    scroll_to_top_and_focus
+                } else {
+                    self.search.is_hidden = true;
+                    self.filter_rows();
+                    scroll_to_top_and_focus.chain(text_input::select_all(SEARCH_INPUT_ID))
+                }
+            }
+            TextInputAction::Hide => {
+                self.search.is_hidden = false;
+                self.set_freeze(false);
+                self.sort_rows();
+                self.filter_rows();
+                scroll_to_top
             }
         }
     }
