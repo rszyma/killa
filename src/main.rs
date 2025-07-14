@@ -201,7 +201,7 @@ impl App {
 
                 ////////////////////////
                 // freeze
-                (NO_MODS, T::Named(K::Enter), true) => Some(Message::Refreeze),
+                (NO_MODS, T::Named(K::Enter), _) => Some(Message::Refreeze),
                 (M::SHIFT, T::Named(K::Enter), _) => Some(Message::SwitchFreeze(false)),
 
                 _ => None,
