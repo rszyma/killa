@@ -20,7 +20,7 @@ iced_core = "0.13.2"
 iced_futures = "0.13.1"
 num_cpus = "1.16.0"
 plotters-iced = "0.11.0"
-tokio = { version = "1.43.0", features = ["time"] }
+tokio = { version = "1.46.1", features = ["time"] }
 
 iced = { version = "0.13.1", features = [
     "system", "lazy", "tokio", "canvas"
