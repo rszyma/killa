@@ -5,7 +5,7 @@ use iced::alignment::{Horizontal, Vertical};
 use iced::widget::container::background;
 use iced::widget::tooltip::Position;
 use iced::widget::{
-    button, checkbox, column, container, responsive, row, scrollable, text, text_input, tooltip,
+    checkbox, column, container, responsive, row, scrollable, text, text_input, tooltip,
 };
 use iced::window::{self};
 use iced::{
@@ -14,6 +14,7 @@ use iced::{
 };
 use iced_table::table::{self};
 use process_data::{KillaData, ProcessListSort, SortOrder};
+use rustix::process::{kill_process, Signal};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
@@ -80,13 +81,15 @@ enum Message {
     Resizing(usize, f32),
     Resized,
     ToggleFreeze,
-    SwitchFreeze(bool),
-    Refreeze, // If already freezed refresh data then freeze again, otherwise freeze.
+    Freeze(bool),
     ToggleWireframe(bool),
     SetSortField(ColumnKind),
-    DeleteRow(usize),
     Search(TextInputAction),
-    Back, // Escape key or back button pressed.
+    StageSignalAllFiltered(rustix::process::Signal),
+    /// Escape key or back button pressed.
+    Back,
+    /// Enter pressed.
+    Enter,
 }
 
 #[derive(Clone)]
@@ -105,6 +108,7 @@ struct App {
     sort: ProcessListSort,
     last_data: KillaData,
     freeze: Freeze,
+    staged_sig_all_filtered: Option<rustix::process::Signal>,
     enable_wireframe: bool,
 }
 
@@ -135,6 +139,7 @@ impl Default for App {
             last_data: KillaData::default(),
             freeze: Freeze::Disabled,
             enable_wireframe: false,
+            staged_sig_all_filtered: None,
         }
     }
 }
@@ -171,9 +176,13 @@ impl App {
             };
 
             const NO_MODS: iced::keyboard::Modifiers = M::empty();
+            const CTRL_SHIFT: iced::keyboard::Modifiers = M::CTRL.union(M::SHIFT);
 
             // keybinds
             let res: Option<_> = match (modifiers, key.as_ref(), is_search_box_active) {
+                (_, T::Named(K::Escape), _) => Some(Message::Back),
+                (_, T::Named(K::Enter), _) => Some(Message::Enter),
+
                 ////////////////////////
                 // search
                 (NO_MODS, T::Character(c), false) => {
@@ -183,15 +192,14 @@ impl App {
                 (NO_MODS, T::Named(K::Backspace), false) => {
                     Some(Message::Search(TextInputAction::PopLastChar))
                 }
-                (NO_MODS, T::Named(K::Escape), _) => {
-                    // N.B. This can't be handled here because I want diffrent action if freeze is enabled,
-                    // but can't access self.freeze in this closure.
-                    Some(Message::Back)
-                }
+
                 (M::CTRL, T::Character("f"), true) => Some(Message::Search(TextInputAction::Hide)),
                 (M::CTRL, T::Character("f"), false) => {
                     Some(Message::Search(TextInputAction::Toggle))
                 }
+
+                (M::CTRL, T::Character("j"), _) => Some(Message::Freeze(true)),
+                (CTRL_SHIFT, T::Character("j"), _) => Some(Message::Freeze(false)),
 
                 ////////////////////////
                 // select sort field
@@ -199,10 +207,13 @@ impl App {
                 (M::CTRL, T::Character("2"), _) => Some(Message::SetSortField(ColumnKind::Memory)),
                 (M::CTRL, T::Character("3"), _) => Some(Message::SetSortField(ColumnKind::PID)),
 
-                ////////////////////////
-                // freeze
-                (NO_MODS, T::Named(K::Enter), _) => Some(Message::Refreeze),
-                (M::SHIFT, T::Named(K::Enter), _) => Some(Message::SwitchFreeze(false)),
+                // other
+                (M::CTRL, T::Character("k"), _) => Some(Message::StageSignalAllFiltered(
+                    rustix::process::Signal::Term,
+                )),
+                (CTRL_SHIFT, T::Character("k"), _) => Some(Message::StageSignalAllFiltered(
+                    rustix::process::Signal::Kill,
+                )),
 
                 _ => None,
             };
@@ -221,7 +232,10 @@ impl App {
                 }
                 return task_chain;
             }
-            Message::Search(ev) => return self.handle_search(ev),
+            Message::Search(ev) => {
+                self.staged_sig_all_filtered = None;
+                return self.handle_search(ev);
+            }
             Message::CollectedData(data) => {
                 let kd = KillaData::from(data);
                 if let Freeze::Enabled(d) = &mut self.freeze {
@@ -248,7 +262,14 @@ impl App {
                     column.width += offset;
                 }
             }),
+            Message::Freeze(enable) => {
+                self.staged_sig_all_filtered = None;
+                self.set_freeze(enable);
+                self.sort_rows();
+                self.filter_rows();
+            }
             Message::ToggleFreeze => {
+                self.staged_sig_all_filtered = None;
                 if matches!(self.freeze, Freeze::Enabled(_)) {
                     self.set_freeze(false);
                     self.sort_rows();
@@ -257,40 +278,36 @@ impl App {
                     self.set_freeze(true)
                 }
             }
-            Message::SwitchFreeze(enable) => {
-                self.set_freeze(enable);
-                if !enable {
-                    self.sort_rows();
-                    self.filter_rows();
-                }
-            }
-            Message::Refreeze => {
-                if matches!(self.freeze, Freeze::Disabled) {
-                    self.set_freeze(true);
-                } else {
-                    self.set_freeze(false);
-                    self.sort_rows();
-                    self.filter_rows();
-                    self.set_freeze(true);
-                }
-            }
             Message::ToggleWireframe(enabled) => self.enable_wireframe = enabled,
             Message::SetSortField(sort_field) => {
+                self.staged_sig_all_filtered = None;
                 self.sort.column = sort_field;
                 self.sort_rows();
                 self.filter_rows();
             }
-            Message::DeleteRow(index) => {
-                self.rows.remove(index);
-            }
             Message::Back => {
+                if self.staged_sig_all_filtered.is_some() {
+                    self.staged_sig_all_filtered = None;
+                }
+
                 if matches!(self.freeze, Freeze::Enabled(_)) {
-                    // Basically do what `Message::SwitchFreeze(false)` does.
                     self.set_freeze(false);
                     self.sort_rows();
                     self.filter_rows();
                 } else {
                     return self.handle_search(TextInputAction::Hide);
+                }
+            }
+            Message::Enter => {
+                if let Some(sig) = self.staged_sig_all_filtered {
+                    self.staged_sig_all_filtered = None;
+                    self.sig_all_filtered(sig);
+                    self.set_freeze(false);
+                }
+            }
+            Message::StageSignalAllFiltered(sig) => {
+                if matches!(self.freeze, Freeze::Enabled(_)) && self.search.text.len() > 3 {
+                    self.staged_sig_all_filtered = Some(sig);
                 }
             }
         }
@@ -364,8 +381,17 @@ impl App {
         // fix transparency issues with table.
         let table = container(table).style(|theme| background(theme.palette().background));
 
-        // cool blue border on freeze
-        let table = if matches!(self.freeze, Freeze::Enabled(_)) {
+        // red border on kill confirmation or cool blue on freeze.
+        let table = if let Some(sig) = self.staged_sig_all_filtered {
+            let color = match sig {
+                Signal::Term => color!(0xFF0000), // red
+                Signal::Kill => color!(0x9B26B6), // violet
+                _ => color!(0xCCFF00),            // yellow
+            };
+            container(table).style(move |_theme| {
+                container::bordered_box(&self.theme).border(border::width(10).color(color))
+            })
+        } else if matches!(self.freeze, Freeze::Enabled(_)) {
             container(table).style(|_theme| {
                 container::bordered_box(&self.theme)
                     .border(border::width(10).color(color!(0x6495ED)))
@@ -489,6 +515,32 @@ impl App {
             }
         }
     }
+
+    fn sig_all_filtered(&mut self, sig: rustix::process::Signal) {
+        let pids: Vec<i32> = self.rows.iter().map(|x| x.pid).collect();
+        for pid in pids {
+            print!("sending {sig:?} to {pid} ... ");
+
+            let result = kill_process(
+                rustix::thread::Pid::from_raw(pid).expect("pid in table should be valid"),
+                sig,
+            );
+            match result {
+                Ok(()) => {
+                    println!("ok");
+                }
+                Err(err) => {
+                    println!("error: {err}");
+                }
+            }
+
+            // refresh/refreeze
+            self.set_freeze(false);
+            self.sort_rows();
+            self.filter_rows();
+            self.set_freeze(true);
+        }
+    }
 }
 
 struct Column {
@@ -508,8 +560,7 @@ impl Column {
             ColumnKind::CpuTime => 100.0,
             ColumnKind::Started => 100.0,
 
-            ColumnKind::Index => 10.0,  // 60.0,
-            ColumnKind::Delete => 10.0, // 100.0,
+            ColumnKind::Index => 10.0, // 60.0,
         };
 
         Self {
@@ -531,7 +582,6 @@ pub enum ColumnKind {
     CpuTime,
 
     Index,
-    Delete,
 }
 
 /// Actual storage for data row.
@@ -564,7 +614,6 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
             ColumnKind::Command => "Command",
 
             ColumnKind::Index => "Index",
-            ColumnKind::Delete => "",
         };
 
         container(text(content)).center_y(24).into()
@@ -617,9 +666,6 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for Column {
                 .into(),
 
             ColumnKind::Index => text(row_index).size(font_size).into(),
-            ColumnKind::Delete => button(text("Delete").size(font_size))
-                .on_press(Message::DeleteRow(row_index))
-                .into(),
         };
 
         container(content).width(Length::Fill).center_y(15).into()

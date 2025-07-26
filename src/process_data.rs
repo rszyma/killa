@@ -166,7 +166,6 @@ impl KillaData {
             crate::ColumnKind::CpuTime => {}
             crate::ColumnKind::Started => {}
             crate::ColumnKind::Index => {}
-            crate::ColumnKind::Delete => {}
         };
         self
     }
