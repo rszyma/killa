@@ -1,6 +1,7 @@
 # killa 🔪
 
-Killa is an opinionated GUI process monitor written in Rust, targeted for Linux desktops.
+Killa is a GUI process monitor written in Rust, targeted for Linux desktops.
+The primary goals are to be fast, be simple, and keyboard-driven, while being usable with mouse too.
 Works on Wayland and X.
 
 tech: [Iced][iced] (frontend) + [Bottom][bottom] (backend)
@@ -15,14 +16,15 @@ Gnome System Monitor startup times are around ~3-5s for me on NixOS, while killa
 
 # Status
 
-Very barebones for now, but usable (I main it).
-Many features are still missing, especially killing processes.
-But most of the ones I need are already implemented.
+All essential features are implemented.
+It is usable to the point that 99% of the time I no longer need to use other process monitors.
+No more significant features are planned at this point in time.
 
 # Features
 
 - Instant startup time (~500ms on my system)
 - Shows a list of processes, sorted by CPU usage, refreshed every 1s
+- Shows total memory usage %
 - Advanced searching:
   - Ctrl+F to focus search field.
   - Case-insensitive.
@@ -34,7 +36,12 @@ But most of the ones I need are already implemented.
       - `cmd:chrome`
       - `any:test:123` (searches for literal "test:123")
       - can be combined with `-` like this: `-pid:1`
-- Shows total memory usage %
+- Allows killing processes
+  (you can press Esc at any step to cancel)
+  1. Filter/search processes (at least 3 chars)
+  2. Ctrl+J to freeze. This stops the search results from updating.
+  3. Ctrl+K to stage SIGTERM / Ctrl+Shift+K to stage SIGKILL.
+  4. Press Enter to actually send the staged signal to all filtered processes.
 
 # Installation
 
