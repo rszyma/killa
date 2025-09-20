@@ -264,9 +264,10 @@ impl App {
             }),
             Message::Freeze(enable) => {
                 self.staged_sig_all_filtered = None;
-                self.set_freeze(enable);
+                self.set_freeze(false);
                 self.sort_rows();
                 self.filter_rows();
+                self.set_freeze(enable);
             }
             Message::ToggleFreeze => {
                 self.staged_sig_all_filtered = None;
