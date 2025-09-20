@@ -307,7 +307,7 @@ impl App {
                 }
             }
             Message::StageSignalAllFiltered(sig) => {
-                if matches!(self.freeze, Freeze::Enabled(_)) && self.search.text.len() > 3 {
+                if matches!(self.freeze, Freeze::Enabled(_)) && self.search.text.len() >= 3 {
                     self.staged_sig_all_filtered = Some(sig);
                 }
             }
