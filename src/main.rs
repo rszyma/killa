@@ -33,6 +33,10 @@ fn main() {
             ..Default::default()
         })
         .window(window::Settings {
+            platform_specific: window::settings::PlatformSpecific {
+                application_id: "killa".to_string(), // class
+                ..Default::default()
+            },
             size: Size::new(1024.0, 512.0),
             // icon: todo!(),
             ..Default::default()
