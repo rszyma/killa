@@ -4,6 +4,8 @@ Killa is a GUI process monitor written in Rust, targeted for Linux desktops.
 The primary goals are to be fast, be simple, and keyboard-driven, while being usable with mouse too.
 Works on Wayland and X.
 
+<img width="1071" height="573" alt="image" src="https://github.com/user-attachments/assets/8d537705-bb5b-4ebd-8ebe-3799e2e05b9b" />
+
 tech: [Iced][iced] (frontend) + [Bottom][bottom] (backend)
 
 # Why another system monitor?
@@ -11,6 +13,8 @@ tech: [Iced][iced] (frontend) + [Bottom][bottom] (backend)
 I wanted a desktop system monitor with looks and UX of [gnome-system-monitor][gsm], but with faster statup times.
 I couldn't find any other UI system monitor that I like (including many terminal ones like atop, btop, htop, glances, etc.).
 So I've wrote my own.
+
+For reference, I mainly use process monitors to kill processes, and so killa was made with optimizing workflow of killing processes in mind.  
 
 Gnome System Monitor startup times are around ~3-5s for me on NixOS, while killa is ~500ms.
 
