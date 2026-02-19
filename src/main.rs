@@ -124,7 +124,7 @@ impl Default for App {
                 Column::new(ColumnKind::Memory),
                 Column::new(ColumnKind::CPU),
                 Column::new(ColumnKind::PID),
-                // Column::new(ColumnKind::CpuTime),
+                // Column::new(ColumnKind::CpuTime), // todo
                 // Column::new(ColumnKind::Started), // todo
                 Column::new(ColumnKind::Command),
             ],
@@ -321,7 +321,7 @@ impl App {
     }
 
     /// This is called every time a Message has been processed in [`Self::update`]
-    fn view(&self) -> Element<Message> {
+    fn view(&self) -> Element<'_, Message> {
         // println!("view()");
         let table = responsive(|size| {
             let mut table = iced_table::table(

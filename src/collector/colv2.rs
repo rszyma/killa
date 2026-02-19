@@ -24,7 +24,7 @@ pub enum Input {
 pub fn run_collector_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event> {
     stream::channel(100, |mut output| async move {
         // Create channel for communication back to app.
-        let (sender, receiver) = mpsc::channel(100);
+        let (sender, _receiver) = mpsc::channel(100);
 
         // Send the sender back to the application
         output.send(Event::Ready(sender)).await;

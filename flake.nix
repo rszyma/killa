@@ -67,10 +67,10 @@
           libGL
 
           # deps for X only.
-          xorg.libX11
-          xorg.libXi
-          xorg.libXtst
-          xorg.libXcursor
+          libX11
+          libXi
+          libXtst
+          libXcursor
         ];
         LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";
 
@@ -120,23 +120,22 @@
 
         mkScript = name: text: (pkgs.writeShellScriptBin name text);
         devshellScripts = [
-          (mkScript "f" ''cargo run'')
-          (mkScript "fr" ''cargo run --release'')
+          (mkScript "f" "cargo run")
+          (mkScript "fr" "cargo run --release")
         ];
       in
       {
-        packages =
-          {
-            default = wrappedKillaCrate;
-          }
-          // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-            my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-              }
-            );
-          };
+        packages = {
+          default = wrappedKillaCrate;
+        }
+        // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+            }
+          );
+        };
 
         apps.default = flake-utils.lib.mkApp {
           drv = wrappedKillaCrate;
@@ -166,9 +165,15 @@
           inherit LD_LIBRARY_PATH;
           # RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
           # "CARGO_TARGET_${targetUpperSnake}_LINKER" = "${pkgs.lld_18}/bin/lld";
+
           # RUSTFLAGS = nixpkgs.lib.strings.concatStringsSep " " [ ];
+
           RUST_BACKTRACE = 1;
-          RUST_LOG = "debug";
+
+          # RUST_LOG = "iced=trace,wgpu=trace,winit=debug"; # shit doesn't do anything
+          # RUST_LOG = "debug";
+
+          # WGPU_BACKEND = "gl"; # vulkan, metal, dx12, gl
         };
 
         checks = {

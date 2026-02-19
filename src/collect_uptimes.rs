@@ -66,12 +66,9 @@ fn _get_process_start_time(
     })?;
 
     // Retrieve the process statistics
-    let stat = process.stat().map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Failed to get process stat: {}", e),
-        )
-    })?;
+    let stat = process
+        .stat()
+        .map_err(|e| io::Error::other(format!("Failed to get process stat: {}", e)))?;
 
     let started_since_boot = TimeDelta::from_std(Duration::from_secs(
         stat.starttime / (clock_ticks_per_sec as u64),
