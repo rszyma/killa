@@ -2,10 +2,10 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use bottom::event::BottomEvent;
-use iced_futures::futures::channel::mpsc;
-use iced_futures::futures::sink::SinkExt;
-use iced_futures::futures::Stream;
-use iced_futures::stream;
+use iced::futures::Stream;
+use iced::futures::channel::mpsc;
+use iced::futures::sink::SinkExt;
+use iced::stream;
 use tokio::time::sleep;
 
 pub enum Event {
@@ -22,7 +22,7 @@ pub enum Input {
 }
 
 pub fn run_collector_worker(collector_rx: Receiver<BottomEvent>) -> impl Stream<Item = Event> {
-    stream::channel(100, |mut output| async move {
+    stream::channel(100, |mut output: mpsc::Sender<Event>| async move {
         // Create channel for communication back to app.
         let (sender, _receiver) = mpsc::channel(100);
 

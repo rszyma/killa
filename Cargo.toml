@@ -4,7 +4,7 @@ description = "Process monitor for Wayland"
 version = "0.0.0"
 authors = ["rszyma <rszyma.dev@gmail.com>"]
 license = "GPL-3.0-or-later"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [workspace]
@@ -16,48 +16,24 @@ members = [
 [dependencies]
 bottom = { path = "./crates/bottom" }
 bytesize = "1.1"
-iced_core = "0.13.2"
-iced_futures = "0.13.1"
-num_cpus = "1.16.0"
-plotters-iced = "0.11.0"
-tokio = { version = "1.46.1", features = ["time"] }
-
-iced = { version = "0.13.1", features = [
-    "system", "lazy", "tokio", "canvas"
+# 0.14 waiting room - which will include perf optizmiation improvement
+# when just moving mouse around.
+#  https://github.com/iced-rs/iced/pull/2662
+iced = { version = "0.14.0", features = [
+    # "system",
+    "lazy",
+    "tokio",
+    "canvas"
     # "logging"
     # "debug"
 ] }
 
-# 0.14 waiting room - which will include perf optizmiation improvement
-# when just moving mouse around.
-#  https://github.com/iced-rs/iced/pull/2662
-iced_table = "0.13.0"
+num_cpus = "1.16.0"
+tokio = { version = "1.46.1", features = ["time"] }
+
 humantime = "2.1.0"
 procfs = { version = "0.17.0", features = [ "chrono" ] }
 chrono = "0.4.39"
 rustix = "0.38.44"
 anyhow = "1.0.95"
 sysinfo = "0.33.1"
-
-# + auto-detect-theme
-# + fira-sans
-# + tiny-skia
-# + wgpu
-# - advanced
-# - async-std
-# - canvas
-# - debug
-# - highlighter
-# - iced_highlighter
-# - image
-# - image-without-codecs
-# - lazy
-# - markdown
-# - multi-window
-# - qr_code
-# - smol
-# - svg
-# - system
-# - tokio
-# - web-colors
-# - webgl

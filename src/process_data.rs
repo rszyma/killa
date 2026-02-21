@@ -1,9 +1,11 @@
+use crate::ui::ColumnKind;
+use crate::ui::Row;
 use bottom::data_collection::memory::MemHarvest;
 
 #[derive(Clone, Default)]
 pub struct KillaData {
     // todo: optimization by keeping a field of ordered ones?
-    rows: Vec<crate::Row>,
+    rows: Vec<Row>,
     // todo: should we keep the original data? I mean this will hold original data, no?
     pub memory: MemHarvest,
 }
@@ -14,7 +16,9 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
             .list_of_processes
             .unwrap_or_default()
             .iter()
-            .map(|ps| crate::Row {
+            .enumerate()
+            .map(|(idx, ps)| Row {
+                row_index: idx,
                 program_name: ps.name.clone(),
                 program_name_lowercase: ps.name.to_lowercase(),
                 mem: ps.mem_usage_bytes / 1_000_000,
@@ -146,14 +150,14 @@ impl KillaData {
         self
     }
 
-    pub fn sort_by_column(&mut self, col: crate::ColumnKind, order: SortOrder) -> &mut Self {
+    pub fn sort_by_column(&mut self, col: ColumnKind, order: SortOrder) -> &mut Self {
         match col {
-            crate::ColumnKind::Name => {}
-            crate::ColumnKind::Memory => match order {
+            ColumnKind::Name => {}
+            ColumnKind::Memory => match order {
                 SortOrder::Ascending => self.rows.sort_by_key(|row| row.mem),
                 SortOrder::Descending => self.rows.sort_by_key(|row| u64::MAX - row.mem),
             },
-            crate::ColumnKind::CPU => match order {
+            ColumnKind::Cpu => match order {
                 SortOrder::Ascending => self
                     .rows
                     .sort_by_key(|row| (row.cpu_perc * 10000.0f32) as u32 - (100 * 10000)),
@@ -161,17 +165,16 @@ impl KillaData {
                     .rows
                     .sort_by_key(|row| (100 * 10000) - (row.cpu_perc * 10000.0f32) as u32),
             },
-            crate::ColumnKind::PID => self.rows.sort_by_key(|row| i32::MAX - row.pid),
-            crate::ColumnKind::Command => {}
-            crate::ColumnKind::CpuTime => {}
-            crate::ColumnKind::Started => {}
-            crate::ColumnKind::Index => {}
+            ColumnKind::Pid => self.rows.sort_by_key(|row| i32::MAX - row.pid),
+            ColumnKind::Command => {}
+            ColumnKind::CpuTime => {}
+            ColumnKind::Started => {}
         };
         self
     }
 }
 
-impl From<KillaData> for Vec<crate::Row> {
+impl From<KillaData> for Vec<Row> {
     fn from(val: KillaData) -> Self {
         val.rows
     }
@@ -186,7 +189,7 @@ pub enum SortOrder {
 
 #[derive(Clone, Copy)]
 pub struct ProcessListSort {
-    pub(crate) column: crate::ColumnKind,
+    pub(crate) column: ColumnKind,
     pub(crate) order: SortOrder,
 }
 
@@ -246,7 +249,8 @@ mod tests {
     fn test_search() {
         let data = KillaData {
             rows: vec![
-                crate::Row {
+                Row {
+                    row_index: 0,
                     program_name: "init".to_string(),
                     program_name_lowercase: "init".to_string(),
                     mem: 100_000,
@@ -256,7 +260,8 @@ mod tests {
                     command_lowercase: "init".to_string(),
                     cpu_time: Duration::from_secs(20),
                 },
-                crate::Row {
+                Row {
+                    row_index: 1,
                     program_name: "killa".to_string(),
                     program_name_lowercase: "killa".to_string(),
                     mem: 300_000,
@@ -266,7 +271,8 @@ mod tests {
                     command_lowercase: "/nix/store/xxxxxxxxxxxx-killa".to_string(),
                     cpu_time: Duration::from_secs(10),
                 },
-                crate::Row {
+                Row {
+                    row_index: 2,
                     program_name: "firefox".to_string(),
                     program_name_lowercase: "firefox".to_string(),
                     mem: 100_000_000,

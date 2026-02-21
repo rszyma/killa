@@ -1,4 +1,4 @@
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 use bottom::app::DataFilters;
 use bottom::create_collection_thread;
