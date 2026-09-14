@@ -31,6 +31,7 @@ fn main() {
                 ..Default::default()
             },
             size: Size::new(1024.0, 512.0),
+            position: window::Position::Centered,
             // icon: todo!(),
             ..Default::default()
         })
