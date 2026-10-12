@@ -350,38 +350,37 @@ impl App {
             base
         };
 
+        let mut overlay = widget::Stack::new().push(base);
+
         if let Some(copied) = &self.copied {
             let mut short: String = copied.chars().take(60).collect();
             if short.len() < copied.len() {
                 short.push('…');
             }
-            widget::Stack::new()
-                .push(base)
-                .push(
-                    container(
-                        container(text(format!("Copied {short}")).size(12))
-                            .padding(10)
-                            .style(|theme: &Theme| {
-                                let palette = theme.extended_palette();
-                                let color_set = palette.background.weak;
-                                iced::widget::container::Style {
-                                    background: Some(color_set.color.into()),
-                                    text_color: Some(color_set.text),
-                                    border: iced::border::rounded(8),
-                                    ..Default::default()
-                                }
-                            }),
-                    )
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_x(Horizontal::Center)
-                    .align_y(Vertical::Bottom)
-                    .padding(24),
+            overlay = overlay.push(
+                container(
+                    container(text(format!("Copied {short}")).size(12))
+                        .padding(10)
+                        .style(|theme: &Theme| {
+                            let palette = theme.extended_palette();
+                            let color_set = palette.background.weak;
+                            iced::widget::container::Style {
+                                background: Some(color_set.color.into()),
+                                text_color: Some(color_set.text),
+                                border: iced::border::rounded(8),
+                                ..Default::default()
+                            }
+                        }),
                 )
-                .into()
-        } else {
-            base
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Bottom)
+                .padding(24),
+            );
         }
+
+        overlay.into()
     }
 
     pub fn page_delta(&self) -> f32 {
