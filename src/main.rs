@@ -187,6 +187,9 @@ impl App {
                                 .width(size.width * col_kind.width_ratio()),
                             |row: Row| row.cell(col_kind),
                         )
+                        .width(Length::FillPortion(
+                            (col_kind.width_ratio() * 100.0) as u16,
+                        ))
                     })
                     .collect::<Vec<_>>(),
                 self.rows.clone(),
