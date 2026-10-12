@@ -128,7 +128,7 @@
         packages = {
           default = wrappedKillaCrate;
         }
-        // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+        // lib.optionalAttrs (!pkgs.stdenv.hostPlatform.isDarwin) {
           my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (
             commonArgs
             // {
