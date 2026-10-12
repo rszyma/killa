@@ -67,6 +67,7 @@ struct App {
     pub staged_sig_all_filtered: Option<rustix::process::Signal>,
     pub wireframe_enabled: bool,
     pub copied: Option<String>,
+    pub window_size: Size,
 }
 
 impl App {
@@ -180,6 +181,29 @@ impl App {
                         |_| Message::CopyNoticeExpired,
                     ),
                 ]);
+            }
+            Message::WindowResized(size) => {
+                self.window_size = size;
+            }
+            Message::PageDown => {
+                let delta = self.page_delta();
+                return widget::operation::scroll_by(
+                    self.table_top_id.clone(),
+                    scrollable::AbsoluteOffset { x: 0.0, y: delta },
+                );
+            }
+            Message::PageUp => {
+                let delta = self.page_delta();
+                return widget::operation::scroll_by(
+                    self.table_top_id.clone(),
+                    scrollable::AbsoluteOffset { x: 0.0, y: -delta },
+                );
+            }
+            Message::ScrollBy(dy) => {
+                return widget::operation::scroll_by(
+                    self.table_top_id.clone(),
+                    scrollable::AbsoluteOffset { x: 0.0, y: dy },
+                );
             }
             Message::CopyNoticeExpired => {
                 self.copied = None;
@@ -517,6 +541,7 @@ impl Default for App {
             freeze: FreezeState::Disabled,
             wireframe_enabled: false,
             copied: None,
+            window_size: Size::new(1024.0, 512.0),
             staged_sig_all_filtered: None,
         }
     }

@@ -1,4 +1,5 @@
 use crate::ui::ColumnKind;
+use iced::Size;
 
 /// Messages that update UI.
 #[derive(Debug, Clone)]
@@ -13,6 +14,10 @@ pub enum Message {
     ToggleColumn(ColumnKind, bool),
     CopyToClipboard(String),
     CopyNoticeExpired,
+    PageDown,
+    PageUp,
+    ScrollBy(f32),
+    WindowResized(Size),
     SetSortField(ColumnKind),
     Search(TextInputAction),
     StageSignalAllFiltered(rustix::process::Signal),

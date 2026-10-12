@@ -8,6 +8,10 @@ pub fn handle_keybinds() -> Subscription<Message> {
         use keyboard::key::Named as K;
 
         // Right now, there's only one widget that can capture input - seach box.
+        if let Event::Window(iced::window::Event::Resized(size)) = &event {
+            return Some(Message::WindowResized(size.clone()));
+        }
+
         let is_search_box_active = matches!(status, event::Status::Captured);
 
         let (key, modifiers) =
@@ -24,6 +28,10 @@ pub fn handle_keybinds() -> Subscription<Message> {
         let res: Option<_> = match (modifiers, key.as_ref(), is_search_box_active) {
             (_, T::Named(K::Escape), _) => Some(Message::Back),
             (_, T::Named(K::Enter), _) => Some(Message::Enter),
+            (_, T::Named(K::PageDown), _) => Some(Message::PageDown),
+            (_, T::Named(K::PageUp), _) => Some(Message::PageUp),
+            (NO_MODS, T::Named(K::ArrowDown), false) => Some(Message::ScrollBy(40.0)),
+            (NO_MODS, T::Named(K::ArrowUp), false) => Some(Message::ScrollBy(-40.0)),
 
             ////////////////////////
             // search
