@@ -452,7 +452,7 @@ impl App {
                 self.search.text = s;
                 self.set_freeze(false);
                 self.filter_rows();
-                scroll_to_top_and_focus
+                scroll_to_top
             }
             TextInputAction::PopLastChar => {
                 if self.search.is_hidden {
@@ -469,7 +469,7 @@ impl App {
                 if self.search.is_hidden {
                     self.search.is_hidden = false;
                     self.filter_rows();
-                    scroll_to_top_and_focus
+                    scroll_to_top
                 } else {
                     self.search.is_hidden = true;
                     self.filter_rows();
