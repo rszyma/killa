@@ -469,12 +469,20 @@ impl App {
                 if self.search.is_hidden {
                     self.search.is_hidden = false;
                     self.filter_rows();
-                    scroll_to_top
+                    if self.search.text.is_empty() {
+                        Task::none()
+                    } else {
+                        scroll_to_top
+                    }
                 } else {
                     self.search.is_hidden = true;
                     self.filter_rows();
-                    scroll_to_top_and_focus
-                        .chain(iced::widget::operation::select_all(SEARCH_INPUT_ID))
+                    if self.search.text.is_empty() {
+                        iced::widget::operation::focus(SEARCH_INPUT_ID)
+                    } else {
+                        scroll_to_top_and_focus
+                            .chain(iced::widget::operation::select_all(SEARCH_INPUT_ID))
+                    }
                 }
             }
             TextInputAction::Hide => {
@@ -482,7 +490,11 @@ impl App {
                 self.set_freeze(false);
                 self.sort_rows();
                 self.filter_rows();
-                scroll_to_top
+                if self.search.text.is_empty() {
+                    Task::none()
+                } else {
+                    scroll_to_top
+                }
             }
         }
     }
