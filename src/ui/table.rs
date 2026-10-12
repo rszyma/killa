@@ -18,6 +18,7 @@ pub struct Row {
     pub command: String,
     pub command_lowercase: String, // index for search
     pub cpu_time: Duration,
+    pub uptime: Duration,
     // start_time: Option<chrono::DateTime<chrono::Local>>,
 }
 
@@ -68,12 +69,27 @@ impl Row {
             })
             .size(font_size)
             .into(),
-            ColumnKind::CpuTime => text!("{}", humantime::format_duration(self.cpu_time))
-                .size(font_size)
-                .into(),
+            ColumnKind::CpuTime => if self.cpu_time.is_zero() {
+                text!("—")
+            } else {
+                text!("{}", humantime::format_duration(self.cpu_time))
+            }
+            .size(font_size)
+            .into(),
+            ColumnKind::Uptime => if self.uptime.is_zero() {
+                text!("—")
+            } else {
+                text!("{}", humantime::format_duration(self.uptime))
+            }
+            .size(font_size)
+            .into(),
         };
 
-        container(content).width(Length::Fill).center_y(15).into()
+        container(content)
+            .width(Length::Fill)
+            .center_y(15)
+            .clip(true)
+            .into()
     }
 }
 
@@ -86,6 +102,7 @@ pub enum ColumnKind {
     Command,
     Started,
     CpuTime,
+    Uptime,
 }
 
 impl Display for ColumnKind {
@@ -96,6 +113,7 @@ impl Display for ColumnKind {
             ColumnKind::Cpu => f.write_str("CPU"),
             ColumnKind::Pid => f.write_str("ID"),
             ColumnKind::CpuTime => f.write_str("Time"),
+            ColumnKind::Uptime => f.write_str("Uptime"),
             ColumnKind::Started => f.write_str("Started"),
             ColumnKind::Command => f.write_str("Command"),
         }
@@ -109,8 +127,9 @@ impl ColumnKind {
             ColumnKind::Memory => 0.1,
             ColumnKind::Cpu => 0.06,
             ColumnKind::Pid => 0.08,
-            ColumnKind::Command => 0.4,
+            ColumnKind::Command => 0.3,
             ColumnKind::CpuTime => 0.1,
+            ColumnKind::Uptime => 0.1,
             ColumnKind::Started => 0.1,
         }
     }

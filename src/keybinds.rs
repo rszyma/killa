@@ -46,6 +46,12 @@ pub fn handle_keybinds() -> Subscription<Message> {
             (M::CTRL, T::Character("1"), _) => Some(Message::SetSortField(ColumnKind::Cpu)),
             (M::CTRL, T::Character("2"), _) => Some(Message::SetSortField(ColumnKind::Memory)),
             (M::CTRL, T::Character("3"), _) => Some(Message::SetSortField(ColumnKind::Pid)),
+            (M::CTRL, T::Character("4"), _) => {
+                Some(Message::SetSortField(ColumnKind::CpuTime))
+            }
+            (M::CTRL, T::Character("5"), _) => {
+                Some(Message::SetSortField(ColumnKind::Uptime))
+            }
 
             // other
             (M::CTRL, T::Character("k"), _) => Some(Message::StageSignalAllFiltered(

@@ -129,6 +129,10 @@ impl App {
             Message::ToggleWireframe(enabled) => self.wireframe_enabled = enabled,
             Message::SetSortField(sort_field) => {
                 self.staged_sig_all_filtered = None;
+                if matches!(sort_field, ColumnKind::Uptime) {
+                    self.sort.order = SortOrder::Ascending;
+                } else {
+                    self.sort.order = SortOrder::Descending;
                 self.sort.column = sort_field;
                 self.sort_rows();
                 self.filter_rows();
@@ -408,7 +412,8 @@ impl Default for App {
                 ColumnKind::Memory,
                 ColumnKind::Cpu,
                 ColumnKind::Pid,
-                // ColumnKind::CpuTime, // todo
+                ColumnKind::CpuTime,
+                ColumnKind::Uptime,
                 // ColumnKind::Started, // todo
                 ColumnKind::Command,
             ],

@@ -28,7 +28,8 @@ impl From<Box<bottom::data_collection::Data>> for KillaData {
                 pid: ps.pid,
                 command: ps.command.clone(),
                 command_lowercase: ps.command.to_lowercase(),
-                cpu_time: ps.time,
+                cpu_time: ps.cpu_time,
+                uptime: ps.time,
             })
             .collect();
         Self {
@@ -167,7 +168,18 @@ impl KillaData {
             },
             ColumnKind::Pid => self.rows.sort_by_key(|row| i32::MAX - row.pid),
             ColumnKind::Command => {}
-            ColumnKind::CpuTime => {}
+            ColumnKind::CpuTime => match order {
+                SortOrder::Ascending => self.rows.sort_by_key(|row| row.cpu_time),
+                SortOrder::Descending => {
+                    self.rows.sort_by_key(|row| std::cmp::Reverse(row.cpu_time))
+                }
+            },
+            ColumnKind::Uptime => match order {
+                SortOrder::Ascending => self.rows.sort_by_key(|row| row.uptime),
+                SortOrder::Descending => {
+                    self.rows.sort_by_key(|row| std::cmp::Reverse(row.uptime))
+                }
+            },
             ColumnKind::Started => {}
         };
         self
@@ -259,6 +271,7 @@ mod tests {
                     command: "init".to_string(),
                     command_lowercase: "init".to_string(),
                     cpu_time: Duration::from_secs(20),
+                    uptime: Duration::from_secs(200),
                 },
                 Row {
                     row_index: 1,
@@ -270,6 +283,7 @@ mod tests {
                     command: "/nix/store/xxxxxxxxxxxx-killa".to_string(),
                     command_lowercase: "/nix/store/xxxxxxxxxxxx-killa".to_string(),
                     cpu_time: Duration::from_secs(10),
+                    uptime: Duration::from_secs(100),
                 },
                 Row {
                     row_index: 2,
@@ -281,6 +295,7 @@ mod tests {
                     command: "firefox --flag1".to_string(),
                     command_lowercase: "firefox --flag1".to_string(),
                     cpu_time: Duration::from_secs(100),
+                    uptime: Duration::from_secs(1000),
                 },
             ],
             memory: MemHarvest {
