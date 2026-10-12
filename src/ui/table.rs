@@ -1,7 +1,7 @@
 use crate::Message;
 use iced::widget::tooltip::Position;
-use iced::widget::{container, text, tooltip};
-use iced::{Element, Length, Pixels, Renderer, Theme};
+use iced::widget::{container, mouse_area, text, tooltip};
+use iced::{Element, Length, Pixels, Renderer, Theme, mouse::Interaction};
 use std::fmt::Display;
 use std::time::Duration;
 
@@ -27,7 +27,10 @@ impl Row {
         let font_size = Pixels::from(13.0);
         let tooltip_font_size = Pixels::from(11.0);
         let content: Element<_> = match for_column {
-            ColumnKind::Name => text!("{}", self.program_name).size(font_size).into(),
+            ColumnKind::Name => mouse_area(text!("{}", self.program_name).size(font_size))
+                .interaction(Interaction::Pointer)
+                .on_press(Message::CopyToClipboard(self.program_name.clone()))
+                .into(),
             ColumnKind::Memory => text!("{} MB", self.mem).size(font_size).into(),
             ColumnKind::Cpu => if self.cpu_perc != 0.0 {
                 text!("{:.1} %", self.cpu_perc)
@@ -36,8 +39,11 @@ impl Row {
             }
             .size(font_size)
             .into(),
-            ColumnKind::Pid => text!("{}", self.pid).size(font_size).into(),
-            ColumnKind::Command => tooltip(
+            ColumnKind::Pid => mouse_area(text!("{}", self.pid).size(font_size))
+                .interaction(Interaction::Pointer)
+                .on_press(Message::CopyToClipboard(self.pid.to_string()))
+                .into(),
+            ColumnKind::Command => mouse_area(tooltip(
                 text!("{}", self.command).size(font_size),
                 container(text!("{}", self.command).size(tooltip_font_size))
                     .padding(10)
@@ -56,8 +62,10 @@ impl Row {
                     })
                     .max_width(700),
                 Position::Bottom,
-            )
-            .into(),
+            ))
+                .interaction(Interaction::Pointer)
+                .on_press(Message::CopyToClipboard(self.command.clone()))
+                .into(),
             ColumnKind::Started => text!("{}", {
                 // TODO: optimize for startup times.
                 // Current implementation is pretty detrimental with the Mutex, it probably adds like 100ms.

@@ -11,6 +11,8 @@ pub enum Message {
     Freeze(bool),
     ToggleWireframe(bool),
     ToggleColumn(ColumnKind, bool),
+    CopyToClipboard(String),
+    CopyNoticeExpired,
     SetSortField(ColumnKind),
     Search(TextInputAction),
     StageSignalAllFiltered(rustix::process::Signal),

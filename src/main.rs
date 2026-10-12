@@ -66,6 +66,7 @@ struct App {
     pub freeze: FreezeState,
     pub staged_sig_all_filtered: Option<rustix::process::Signal>,
     pub wireframe_enabled: bool,
+    pub copied: Option<String>,
 }
 
 impl App {
@@ -169,6 +170,19 @@ impl App {
                 if matches!(self.freeze, FreezeState::Enabled(_)) && self.search.text.len() >= 3 {
                     self.staged_sig_all_filtered = Some(sig);
                 }
+            }
+            Message::CopyToClipboard(text) => {
+                self.copied = Some(text.clone());
+                return Task::batch([
+                    iced::clipboard::write(text),
+                    Task::perform(
+                        tokio::time::sleep(std::time::Duration::from_millis(700)),
+                        |_| Message::CopyNoticeExpired,
+                    ),
+                ]);
+            }
+            Message::CopyNoticeExpired => {
+                self.copied = None;
             }
             Message::SystemThemeChanged(mode) => {
                 self.theme = match mode {
@@ -299,18 +313,55 @@ impl App {
 
         let content = column![topbar, table,].spacing(6);
 
-        let all: Element<_> =
+        let base: Element<_> =
             container(container(content).width(Length::Fill).height(Length::Fill))
                 .padding(20)
                 .center_x(Length::Fill)
                 .center_y(Length::Fill)
                 .into();
 
-        if self.wireframe_enabled {
-            all.explain(Color::from_rgb8(255, 0, 0))
+        let base = if self.wireframe_enabled {
+            base.explain(Color::from_rgb8(255, 0, 0))
         } else {
-            all
+            base
+        };
+
+        if let Some(copied) = &self.copied {
+            let mut short: String = copied.chars().take(60).collect();
+            if short.len() < copied.len() {
+                short.push('…');
+            }
+            widget::Stack::new()
+                .push(base)
+                .push(
+                    container(
+                        container(text(format!("Copied {short}")).size(12))
+                            .padding(10)
+                            .style(|theme: &Theme| {
+                                let palette = theme.extended_palette();
+                                let color_set = palette.background.weak;
+                                iced::widget::container::Style {
+                                    background: Some(color_set.color.into()),
+                                    text_color: Some(color_set.text),
+                                    border: iced::border::rounded(8),
+                                    ..Default::default()
+                                }
+                            }),
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Bottom)
+                    .padding(24),
+                )
+                .into()
+        } else {
+            base
         }
+    }
+
+    pub fn page_delta(&self) -> f32 {
+        (self.window_size.height * 0.8).max(50.0)
     }
 
     pub fn filter_rows(&mut self) {
@@ -465,6 +516,7 @@ impl Default for App {
             last_data: KillaData::default(),
             freeze: FreezeState::Disabled,
             wireframe_enabled: false,
+            copied: None,
             staged_sig_all_filtered: None,
         }
     }
