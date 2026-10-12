@@ -10,6 +10,7 @@ pub enum Message {
     ToggleFreeze,
     Freeze(bool),
     ToggleWireframe(bool),
+    ToggleColumn(ColumnKind, bool),
     SetSortField(ColumnKind),
     Search(TextInputAction),
     StageSignalAllFiltered(rustix::process::Signal),

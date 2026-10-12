@@ -133,4 +133,18 @@ impl ColumnKind {
             ColumnKind::Started => 0.1,
         }
     }
+
+    /// Canonical position, keeps column order stable when toggling visibility.
+    pub fn rank(&self) -> u8 {
+        match self {
+            ColumnKind::Name => 0,
+            ColumnKind::Memory => 1,
+            ColumnKind::Cpu => 2,
+            ColumnKind::Pid => 3,
+            ColumnKind::CpuTime => 4,
+            ColumnKind::Uptime => 5,
+            ColumnKind::Started => 6,
+            ColumnKind::Command => 7,
+        }
+    }
 }

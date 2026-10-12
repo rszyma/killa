@@ -127,12 +127,20 @@ impl App {
                 }
             }
             Message::ToggleWireframe(enabled) => self.wireframe_enabled = enabled,
+            Message::ToggleColumn(col, show) => {
+                self.columns.retain(|c| c.rank() != col.rank());
+                if show {
+                    self.columns.push(col);
+                    self.columns.sort_by_key(|c| c.rank());
+                }
+            }
             Message::SetSortField(sort_field) => {
                 self.staged_sig_all_filtered = None;
                 if matches!(sort_field, ColumnKind::Uptime) {
                     self.sort.order = SortOrder::Ascending;
                 } else {
                     self.sort.order = SortOrder::Descending;
+                }
                 self.sort.column = sort_field;
                 self.sort_rows();
                 self.filter_rows();
@@ -198,13 +206,37 @@ impl App {
         }))
         .id(self.table_top_id.clone());
 
+        let label_font = Font {
+            weight: iced::font::Weight::Normal,
+            ..Default::default()
+        };
         let topbar_left = column![
-            checkbox(matches!(self.freeze, FreezeState::Enabled(_))) // TODO: "Freeze" label
-                .on_toggle(|_| Message::ToggleFreeze),
-            checkbox(self.wireframe_enabled).on_toggle(Message::ToggleWireframe), // TODO: "Wireframe" label.
+            row![
+                checkbox(matches!(self.freeze, FreezeState::Enabled(_)))
+                    .label("Freeze")
+                    .font(label_font)
+                    .text_size(13)
+                    .on_toggle(|_| Message::ToggleFreeze),
+                checkbox(self.wireframe_enabled)
+                    .label("Wireframe")
+                    .font(label_font)
+                    .text_size(13)
+                    .on_toggle(Message::ToggleWireframe),
+                checkbox(self.columns.iter().any(|c| c.rank() == ColumnKind::CpuTime.rank()))
+                    .label("Time")
+                    .font(label_font)
+                    .text_size(13)
+                    .on_toggle(|show| Message::ToggleColumn(ColumnKind::CpuTime, show)),
+                checkbox(self.columns.iter().any(|c| c.rank() == ColumnKind::Uptime.rank()))
+                    .label("Uptime")
+                    .font(label_font)
+                    .text_size(13)
+                    .on_toggle(|show| Message::ToggleColumn(ColumnKind::Uptime, show)),
+            ]
+            .spacing(12),
             text(format!("Sorting By {:?}", self.sort.column))
         ]
-        .spacing(6);
+        .spacing(12);
 
         let total_memory_usage = {
             let used = (self.last_data.memory.used_bytes as f64) / 1_000_000_000.0;
@@ -415,8 +447,7 @@ impl Default for App {
                 ColumnKind::Memory,
                 ColumnKind::Cpu,
                 ColumnKind::Pid,
-                ColumnKind::CpuTime,
-                ColumnKind::Uptime,
+                // CpuTime/Uptime hidden by default, toggle with checkboxes.
                 // ColumnKind::Started, // todo
                 ColumnKind::Command,
             ],
