@@ -86,6 +86,10 @@ pub struct ProcessHarvest {
     /// Cumulative process uptime.
     pub time: Duration,
 
+    /// Cumulative user + system CPU time.
+    #[cfg(target_os = "linux")]
+    pub cpu_time: Duration,
+
     /// This is the *effective* user ID of the process. This is only used on
     /// Unix platforms.
     #[cfg(target_family = "unix")]
@@ -121,6 +125,10 @@ impl ProcessHarvest {
         self.total_read_bytes += rhs.total_read_bytes;
         self.total_write_bytes += rhs.total_write_bytes;
         self.time = self.time.max(rhs.time);
+        #[cfg(target_os = "linux")]
+        {
+            self.cpu_time += rhs.cpu_time;
+        }
         #[cfg(feature = "gpu")]
         {
             self.gpu_mem += rhs.gpu_mem;

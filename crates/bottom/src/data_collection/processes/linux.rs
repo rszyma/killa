@@ -232,15 +232,18 @@ fn read_proc(
         })
         .unwrap_or_else(|| "N/A".into());
 
-    let time = if let Ok(ticks_per_sec) = u32::try_from(rustix::param::clock_ticks_per_second()) {
-        if ticks_per_sec == 0 {
-            Duration::ZERO
-        } else {
-            Duration::from_secs(uptime.saturating_sub(stat.start_time / ticks_per_sec as u64))
-        }
-    } else {
-        Duration::ZERO
-    };
+    let ticks_per_sec = u32::try_from(rustix::param::clock_ticks_per_second())
+        .ok()
+        .filter(|ticks| *ticks != 0);
+
+    let time = ticks_per_sec.map_or(Duration::ZERO, |ticks| {
+        Duration::from_secs(uptime.saturating_sub(stat.start_time / ticks as u64))
+    });
+
+    // Cumulative user + system CPU time, converted from clock ticks.
+    let cpu_time = ticks_per_sec.map_or(Duration::ZERO, |ticks| {
+        Duration::from_secs_f64(new_process_times as f64 / ticks as f64)
+    });
 
     Ok((
         ProcessHarvest {
@@ -259,6 +262,7 @@ fn read_proc(
             uid,
             user,
             time,
+            cpu_time,
             #[cfg(feature = "gpu")]
             gpu_mem: 0,
             #[cfg(feature = "gpu")]
